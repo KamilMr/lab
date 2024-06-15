@@ -1,0 +1,21 @@
+# simple deployment file 
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: test
+  name: test
+spec:
+  replicas: 10
+  selector: # here it says which deployment is managing
+    matchLabels: # this he adds
+      app: test
+  strategy: {}
+  template: # template for the pods
+    metadata: # manifestation of pod, the same as before
+      labels:
+        app: test # to the pod
+    spec:
+      containers:
+      - image: httpd
+        name: httpd
