@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: mealie
+  name: mealie
+  namespace: mealie # because we created earlier
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mealie
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: mealie
+    spec:
+      containers:
+      - image: ghcr.io/mealie-recipes/mealie:v1.2.0
+        name: mealie 
+        ports: # without this container will not be exposed
+          - containerPort: 9000 # expose pod to pod
