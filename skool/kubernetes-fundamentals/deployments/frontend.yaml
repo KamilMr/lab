@@ -1,0 +1,25 @@
+# simple deployment file 
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels: # this label is used by service to figureout which pods needs to target
+    app: frontend
+  name: frontend
+spec:
+  replicas: 10
+  selector: # here it says which deployment is managing
+    matchLabels: # this he adds
+      app: frontend
+  template: # template for the pods
+    metadata: # manifestation of pod, the same as before
+      labels:
+        app: frontend # to the pod
+    spec:
+      containers:
+        - image: httpd:alpine3.18
+          name: httpd
+  strategy: 
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1 # max unav during process
+      maxSurge: 1 # max up for example here 11

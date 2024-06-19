@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: Pod
+metadata: 
+  labels:
+  name: nginx-storage
+spec:
+  containers:
+    - image: nginx # nginx container
+      name: nginx
+      volumeMounts:
+        - mountPath: /scratch # location of volume in the container
+          name: scratch-volume # spec which volume
+    - image: busybox # busybox container
+      name: busybox 
+      command: ["/bin/sh", "-c"]
+      args: ["sleep 1000"]
+      volumeMounts:
+        - mountPath: /scratch # location of volume in the container
+          name: scratch-volume # spec which volume
+  volumes: # level of pod
+    - name: scratch-volume
+      emptyDir: # default, is storage but deleted when pod is deleted
+        sizeLimit: 500Mi
+
