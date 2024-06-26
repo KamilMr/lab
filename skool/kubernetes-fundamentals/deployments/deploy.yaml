@@ -18,7 +18,7 @@ spec:
       containers:
         - image: httpd:alpine3.18
           name: httpd
-  strategy: 
+  strategy:
     type: RollingUpdate
     rollingUpdate:
       maxUnavailable: 1 # max unav during process
