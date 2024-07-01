@@ -192,13 +192,13 @@ vim.keymap.set('n', '<C-k>', '<C-w><C-k>', { desc = 'Move focus to the upper win
 
 -- custom key bindings
 -- Insert Mode Remappings
-vim.keymap.set('i', 'clo', 'console.log();<Esc>F(a', {})
+vim.keymap.set('i', 'clo', 'console.log()<Esc>F(a', {})
 -- vim.keymap.set('i', 'cc', '// <Esc>i ', {})
 vim.keymap.set('i', 'cct', '// TODO: <Esc>i', {})
 vim.keymap.set('i', '<Leader>cd', '<Esc>viwdi DONE<Esc>', {})
 vim.keymap.set('i', 'ccb', '/**/ <Esc>F*i', {})
-vim.keymap.set('i', 'cnf', 'const = () => {};<Esc>Ftli', {})
-vim.keymap.set('i', 'caf', '() => {};<Esc>F)i', {})
+vim.keymap.set('i', 'cnf', 'const = () => {}<Esc>Ftli', {})
+vim.keymap.set('i', 'caf', '() => {}<Esc>F)i', {})
 vim.keymap.set('i', 'jk', '<Esc>', {})
 vim.keymap.set('n', '<leader>n', ':NvimTreeFindFileToggle<CR>', { noremap = true })
 vim.keymap.set('n', '<Leader>vv', ':tabnew ~/.config/nvim/init.lua<CR>', { noremap = true })
@@ -208,7 +208,17 @@ vim.opt.foldmethod = 'indent'
 
 -- [[ Basic Autocommands ]]
 --  See `:help lua-guide-autocommands`
+local autocmd_group = vim.api.nvim_create_augroup('Custom auto-commands', { clear = true })
 
+-- vim.api.nvim_create_autocmd({ 'BufWritePost' }, {
+--   pattern = { '*.yaml', '*.yml' },
+--   desc = 'Auto-format YAML files after saving',
+--   callback = function()
+--     local fileName = vim.api.nvim_buf_get_name(0)
+--     vim.cmd(':!yamlfmt ' .. fileName)
+--   end,
+--   group = autocmd_group,
+-- })
 -- Highlight when yanking (copying) text
 --  Try it with `yap` in normal mode
 --  See `:help vim.highlight.on_yank()`
@@ -270,13 +280,27 @@ require('lazy').setup({
   },
 
   {
+    'jackMort/ChatGPT.nvim',
+    event = 'VeryLazy',
+    config = function()
+      require('chatgpt').setup()
+    end,
+    dependencies = {
+      'MunifTanjim/nui.nvim',
+      'nvim-lua/plenary.nvim',
+      'folke/trouble.nvim',
+      'nvim-telescope/telescope.nvim',
+    },
+  },
+
+  {
     'nvim-tree/nvim-tree.lua',
     opts = {
       sort = {
         sorter = 'case_sensitive',
       },
       view = {
-        width = 30,
+        width = 40,
       },
       renderer = {
         group_empty = true,
@@ -331,8 +355,6 @@ require('lazy').setup({
         ['<leader>c'] = { name = '[C]ode', _ = 'which_key_ignore' },
         ['<leader>d'] = { name = '[D]ocument', _ = 'which_key_ignore' },
         ['<leader>r'] = { name = '[R]ename', _ = 'which_key_ignore' },
-        ['<leader>s'] = { name = '[S]earch', _ = 'which_key_ignore' },
-        ['<leader>w'] = { name = '[W]orkspace', _ = 'which_key_ignore' },
         ['<leader>t'] = { name = '[T]oggle', _ = 'which_key_ignore' },
         ['<leader>h'] = { name = 'Git [H]unk', _ = 'which_key_ignore' },
       }
@@ -654,6 +676,7 @@ require('lazy').setup({
       local ensure_installed = vim.tbl_keys(servers or {})
       vim.list_extend(ensure_installed, {
         'stylua', -- Used to format Lua code
+        'sqlls',
       })
       require('mason-tool-installer').setup { ensure_installed = ensure_installed }
 
