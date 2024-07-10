@@ -1,0 +1,69 @@
+<!DOCTYPEhtml>
+	<html lang="en">
+
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<meta http-equiv="X-UA-Compatible" content="ie=edge" />
+		<title>WebSocket</title>
+	</head>
+	<script>
+		const JOIN = 'JOIN';
+		const DISCONNECT = 'DISCONNECT';
+		const ID = 'ID';
+		const CHAT = 'CHAT';
+
+		let id;
+		const socket = new WebSocket('ws://localhost:3001');
+
+		socket.onmessage = e => {
+			console.log(e.data)
+			const [channel, data] = JSON.parse(e.data);
+			if (channel === ID && !id) {
+				id = data;
+				const div = document.getElementById('root');
+				const newDiv = document.createElement('p');
+				newDiv.innerHTML = 'Otrzymales id ' + data;
+				div.appendChild(newDiv);
+			}
+
+			if (channel === CHAT) {
+				const div = document.getElementById('root');
+				const newDiv = document.createElement('p');
+				newDiv.innerHTML = data;
+				div.appendChild(newDiv);
+				newDiv.scrollIntoView();
+			}
+
+			if (channel === JOIN) {
+				const div = document.getElementById('root');
+				const newDiv = document.createElement('p');
+				newDiv.innerHTML = data;
+				div.appendChild(newDiv);
+			}
+
+			if (channel === DISCONNECT) {
+				const div = document.getElementById('root');
+				const newDiv = document.createElement('p');
+				newDiv.innerHTML = data;
+				div.appendChild(newDiv);
+				newDiv.scrollIntoView();
+			}
+		}
+		const sendMessage = () => {
+			socket.send(JSON.stringify([CHAT, id, `Hello from button ${id}!`]));
+		}
+		window.addEventListener('beforeunload', () => {
+			// Optionally send a message to the server that the client is disconnecting
+			socket.send(JSON.stringify([DISCONNECT, id, `Number ${id} left room`]));
+		});
+	</script>
+
+	<body>
+		<div id="root"
+			style="height: 200px; overflow-y: auto; display: flex; flex-direction: column; align-items: center;">
+		</div>
+		<button onclick="sendMessage()">Send</button>
+	</body>
+
+	</html>
