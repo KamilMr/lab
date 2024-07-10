@@ -17,37 +17,35 @@ app.use(express.static(path.join(process.cwd() + '/static')));
 //server
 const server = app.listen(3001);
 
-
 const wss = new WebSocketServer({server});
-const clients = [];
+const clients = {};
 wss.on('connection', ws => {
-  ws.onerror = (err) =>console.log(err);
-  const idx = clients.length;
-  console.log('Clients connected ' + idx);
-  clients[idx] = ws;
+  ws.onerror = err => console.log(err);
+  const newId = Math.max(...[...Object.keys(clients), 0]) + 1;
+  console.log('Clients connected ' + newId);
+  clients[newId] = ws;
 
-  clients[idx].send(ss([ID, idx]));
+  clients[newId].send(ss([ID, newId]));
 
-  clients.forEach((item, index) => {
-    if (index !== idx) {
-      item.send(ss([JOIN, 'Joined ' + idx]));
+  Object.keys(clients).forEach(clId => {
+    if (+clId !== newId) {
+      clients[clId].send(ss([JOIN, 'Joined ' + newId]));
     }
   });
 
   ws.on('message', data => {
-    const [channel, index, d] = sp(data);
-    console.log(sp(data))
+    const [channel, id, d] = sp(data);
 
     // CHAT
-    clients.forEach((item, i) => {
-      if (i !== index) {
-        console.log(i)
-        item.send(ss([channel, d]));
+    Object.keys(clients).forEach(clId => {
+      if (+clId !== id) {
+        clients[clId].send(ss([channel, d]));
       }
     });
 
     if (channel === DISCONNECT) {
-      clients.splice(index, 1);
+      delete clients[id];
+      console.log('Clients connected ' + Object.keys(clients).length);
     }
   });
 });
