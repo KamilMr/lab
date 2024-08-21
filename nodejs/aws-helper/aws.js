@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
-require("dotenv").config();
+require("dotenv").config({
+  path: "path to the env",
+});
 
 const { exec } = require("child_process");
 const yargs = require("yargs/yargs");
@@ -44,7 +46,7 @@ const argv = yargs(hideBin(process.argv))
   .option("method", {
     alias: "m",
     describe: "Choose method to execute",
-    choices: ["cp", "cpDir"],
+    choices: ["cp", "cpDir", "con"],
     demandOption: true,
     type: "string",
   })
@@ -80,6 +82,23 @@ const argv = yargs(hideBin(process.argv))
   .help().argv;
 
 const obj = {
+  con() {
+    const conf = set[argv.dest];
+    const { spawn } = require("child_process");
+
+    const sshSession = spawn(
+      "ssh",
+      ["-i", conf.pem, `${conf.user}@${conf.host}`],
+      {
+        stdio: "inherit", // This option will bind the stdin, stdout, and stderr of the ssh session to the current process
+        shell: true,
+      },
+    );
+
+    sshSession.on("close", (code) => {
+      console.log(`SSH session closed with exit code ${code}`);
+    });
+  },
   cpDir({ from, to }) {
     const conf = set[argv.dest];
     exec(
