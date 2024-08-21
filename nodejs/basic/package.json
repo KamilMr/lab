@@ -3,12 +3,14 @@
   "version": "1.0.0",
   "main": "basic-express.js",
   "scripts": {
+    "start:dev": "nodemon ./basic-express.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "kamil.mrowka@gmail.com",
+  "author": "kamilmrowka.com",
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "express": "^4.19.2"
+    "express": "^4.19.2",
+    "nodemon": "^3.1.4"
   }
 }
