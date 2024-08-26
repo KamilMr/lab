@@ -19,6 +19,5 @@ export const createCompressAndEncrypt = (password, iv) => {
 
 export const createDecryptAndDecompress = (password, iv) => {
   const key = createKey(password);
-  console.log(key)
   return pumpify(createDecipheriv('aes192', key, iv), createGunzip());
 };
