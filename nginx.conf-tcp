@@ -1,0 +1,17 @@
+#Pure layer 4 load balancer. The proxy will stream connections directly to the backend. Nginx will map TCP connections to the backend.
+# I cannot read anything cannot use location as is not be read on layer 4. 
+# 
+stream {
+	upstream allbackend { # Round robin algorithm.
+		server 127.0.0.1:2222; # request first here
+		server 127.0.0.1:3333; # second request here
+		server 127.0.0.1:4444;
+	}
+
+	server { # nginx 3 tcp connection with 3 backends
+		listen 80;
+		proxy_pass allbackend; # I cannot use http protocol
+	}
+}
+
+events {}

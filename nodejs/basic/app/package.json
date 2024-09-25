@@ -4,6 +4,7 @@
   "main": "basic-express.js",
   "scripts": {
     "start:dev": "nodemon ./basic-express.js",
+    "app": "node ./basic-express.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "kamilmrowka.com",
