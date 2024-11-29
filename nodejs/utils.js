@@ -13,3 +13,15 @@ const reduceProp = prop => obj => _.reduce(_.omit(obj, prop), (acc, val, key) =>
 const omitProperties = (collection, property) => {
   return _.map(collection, reduceProp(property));
 };
+
+/**
+ * Renames the keys of an object based on a provided mapping.
+ *
+ * @param {object} data - The object whose keys will be renamed.
+ * @param {Array<Array<string>>} keys - [[oldKey, newKey], [...]]
+ */ const renameKeys = (data, keys) => {
+  return _.mapKeys(data, (_, key) => {
+    const newKey = keys.find(([oldKey]) => oldKey === key)?.[1];
+    return newKey || key;
+  });
+};
