@@ -1,6 +1,5 @@
 http {
-	upstream allbackend { # Round robin algorithm.
-		# ip_hash; this algorithm bind request with one backend belove: sticky sessions.
+	upstream allbackend { # Round robin algorithm. IP_hash; this algorithm binds requests to one backend below: sticky sessions.
 		server 127.0.0.1:2222; # request first here
 		server 127.0.0.1:3333; # second request here
 		server 127.0.0.1:4444;
