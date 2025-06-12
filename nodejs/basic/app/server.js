@@ -3,7 +3,6 @@ const express = require("express");
 const app = express();
 
 app.use("/mid", (req, res) => {
-  throw new Error("Error from mid");
   res.send("<h1>Hello there from mid</h1>");
 });
 
