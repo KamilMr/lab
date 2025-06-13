@@ -9,5 +9,6 @@ const start = Date.now();
 // set the timers
 setTimeout(timerCallback, 100, "100 ms", 100);
 setTimeout(timerCallback, 0, "0 ms", 0);
+// for (let i = 1; i <= 1e9; i++);
 setTimeout(timerCallback, 1, "1 ms", 1);
 setTimeout(timerCallback, 300, "300 ms", 300);
