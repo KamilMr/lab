@@ -25,3 +25,37 @@ const omitProperties = (collection, property) => {
     return newKey || key;
   });
 };
+
+  /**
+   * Pick required keys from source and return missing keys
+   * @param {Object} source - The source object to pick from
+   * @param {Array} requiredKeys - The keys to pick from the source
+   */
+  const pickWithMissing = (source, requiredKeys) => {
+    const data = {};
+    const missingKeys = [];
+    requiredKeys.forEach(path => {
+      if (!Array.isArray(path)) path = [path, path];
+      const v = _.get(source, path[0]);
+      if (v === undefined) return missingKeys.push(path[0]);
+
+      _.set(data, path[1], v);
+    })
+    return {data, missingKeys}
+  }
+
+  // example of usage
+  const requiredKeys = [
+    'country',
+    ['square.southwest.lng', 'square.southwest.lon'],
+    'square.southwest.lat',
+    ['square.northeast.lng','square.northeast.lon'],
+    'square.northeast.lat',
+    'nearestPlace',
+    ['coordinates.lng','lon'],
+    ['coordinates.lat','lat'],
+    ['words','w3w'],
+    'language',
+    'map'
+  ]
+  const {data, missingKeys} = pickWithMissing(respW3W, requiredKeys)
