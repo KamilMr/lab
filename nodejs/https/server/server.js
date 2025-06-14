@@ -2,20 +2,18 @@ const http = require('node:https');
 const fs = require('fs');
 
 const cred = {
-    key: fs.readFile('key.pem', (err, data) => {
-        if (err) {
-            console.error(err);
-        }
-        return data;
-    }),
-    cert: fs.readFile('cert.pem', (err, data) => {
-        if (err) {
-            console.error(err);
-        }
-})
+    key: fs.readFileSync('test-private-key.pem'),
+    cert: fs.readFileSync('cert.pem'),
 }
 
-setImmediate(() => {console.log("Immediate here")}, 0);
+const handler = (req, res) => {
+    console.log('req');
 
-// setTimeout with console log 1000ms
-setTimeout(() => {console.log("hello")}, 0);
+    res.writeHead(200, {'Content-Type': 'text/plain'});
+    res.end('Hello there \n');
+};
+
+const server = http.createServer(cred, handler);
+
+server.listen(443, () => {console.log('Listen on 443');
+})
