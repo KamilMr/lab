@@ -7,10 +7,10 @@ const cred = {
 }
 
 const handler = (req, res) => {
-    console.log('req', req);
+    console.log('Request received');
 
     res.writeHead(200, {'Content-Type': 'text/plain'});
-    res.end('Hello there \n');
+    res.end('Hello from HTTPS \n');
 };
 
 const server = http.createServer(cred, handler);
