@@ -1,0 +1,17 @@
+{
+  "name": "email-parser",
+  "version": "1.0.0",
+  "description": "",
+  "main": "email-read.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "line-stream": "^1.0.0",
+    "node-mbox": "^2.0.0"
+  }
+}
