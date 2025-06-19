@@ -1,3 +1,13 @@
+const {promisify} = require('util');
+const fs = require('fs');
+
+const appendFile = promisify(fs.appendFile);
+const writeFile = promisify(fs.writeFile);
+
+const appendToFile = async (path: string, data: string) => {
+  await appendFile(path, data);
+};
+
 const validateLink = (link: string): boolean => {
   try {
     new URL(link);
@@ -15,3 +25,7 @@ const cleanUrl = (url: string): string => {
 };
 
 export {validateLink, cleanUrl};
+module.exports = {
+  appendToFile,
+  writeFile,
+};
