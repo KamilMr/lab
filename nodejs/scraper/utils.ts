@@ -25,7 +25,9 @@ const cleanUrl = (url: string): string => {
 };
 
 export {validateLink, cleanUrl};
+const log = async (msg: string) => await appendFile('log.txt', msg + '\n');
 module.exports = {
   appendToFile,
   writeFile,
+  log,
 };
