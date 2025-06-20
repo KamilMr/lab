@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Page for Web Scraper</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .section {
+            margin: 30px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .link-group {
+            margin: 15px 0;
+        }
+        a {
+            color: #007bff;
+            text-decoration: none;
+            margin-right: 15px;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .external {
+            color: #dc3545;
+        }
+        .query-params {
+            color: #ffc107;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test Page for Web Scraper</h1>
+    <p>This page contains various types of links to test your web scraper functionality.</p>
+
+    <div class="section">
+        <h2>Internal Links (Same Origin)</h2>
+        <div class="link-group">
+            <a href="/about">About Page</a>
+            <a href="/contact">Contact Page</a>
+            <a href="/products">Products</a>
+            <a href="/services">Services</a>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Links with Query Parameters (Should be filtered out)</h2>
+        <div class="link-group">
+            <a href="/search?q=test" class="query-params">Search with query</a>
+            <a href="/products?category=electronics" class="query-params">Products with category</a>
+            <a href="/page?utm_source=test" class="query-params">Page with UTM</a>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>External Links (Different Origin - Should be filtered out)</h2>
+        <div class="link-group">
+            <a href="https://google.com" class="external">Google</a>
+            <a href="https://github.com" class="external">GitHub</a>
+            <a href="https://stackoverflow.com" class="external">Stack Overflow</a>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Invalid Links (Should be filtered out)</h2>
+        <div class="link-group">
+            <a href="not-a-valid-url">Invalid URL</a>
+            <a href="">Empty href</a>
+            <a href="ftp://example.com">FTP link</a>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Nested Pages</h2>
+        <div class="link-group">
+            <a href="/nested/page1">Nested Page 1</a>
+            <a href="/nested/page2">Nested Page 2</a>
+            <a href="/deep/nested/page">Deep Nested Page</a>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Content for Testing</h2>
+        <p>This page contains various content elements to test scraping:</p>
+        <ul>
+            <li>Text content</li>
+            <li>Lists and formatting</li>
+            <li>Multiple sections</li>
+            <li>Different link types</li>
+        </ul>
+    </div>
+
+    <footer>
+        <p>Test page created for web scraper testing purposes.</p>
+    </footer>
+</body>
+</html>
