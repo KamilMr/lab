@@ -24,9 +24,22 @@ const cleanUrl = (url: string): string => {
     .replaceAll('#', '');
 };
 
-export {validateLink, cleanUrl};
-const log = async (msg: string) => await appendFile('log.txt', msg + '\n');
+const isSameOrigin = (link: string, mainPage: string): boolean => {
+  try {
+    const linkUrl = new URL(link);
+    const mainPageUrl = new URL(mainPage);
+    return linkUrl.origin === mainPageUrl.origin;
+  } catch (e) {
+    return false;
+  }
+};
+
+const log = (path: string) => async (msg: string) => await appendFile(path, msg + '\n');
+
 module.exports = {
+  validateLink,
+  cleanUrl,
+  isSameOrigin,
   appendToFile,
   writeFile,
   log,
