@@ -1,11 +1,12 @@
-const {promisify} = require('util');
-const fs = require('fs');
+const {appendFile, access} = require('node:fs/promises');
 
-const appendFile = promisify(fs.appendFile);
-const writeFile = promisify(fs.writeFile);
-
-const appendToFile = async (path: string, data: string) => {
-  await appendFile(path, data);
+const isFileExists = async (path: string): Promise<boolean> => {
+  try {
+    await access(path);
+    return true;
+  } catch (e) {
+    return false;
+  }
 };
 
 const validateLink = (link: string): boolean => {
@@ -34,13 +35,13 @@ const isSameOrigin = (link: string, mainPage: string): boolean => {
   }
 };
 
-const log = (path: string) => async (msg: string) => await appendFile(path, msg + '\n');
+const log = (path: string) => async (msg: string) =>
+  await appendFile(path, msg + '\n');
 
 module.exports = {
-  validateLink,
   cleanUrl,
+  isFileExists,
   isSameOrigin,
-  appendToFile,
-  writeFile,
   log,
+  validateLink,
 };
