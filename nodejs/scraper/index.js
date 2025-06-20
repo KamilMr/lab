@@ -12,3 +12,14 @@ const {
   log: logToFile,
 } = require('./utils.ts');
 
+const HEADLESS = true;
+const SCRAPED_DIR = 'scraped-pages';
+const COOKIES_FILE = 'cookies.json';
+const LOG_DIR = 'logs';
+
+const POOL_SIZE = 8;
+const pool = [];
+const waiters = [];
+let activePages = 0;
+let pageIdCounter = 0;
+
