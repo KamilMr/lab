@@ -2,3 +2,4 @@ scraped-pages
 node_modules
 .env
 cookies.json
+logs
