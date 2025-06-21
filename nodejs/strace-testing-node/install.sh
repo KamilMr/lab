@@ -13,5 +13,3 @@ nvm install 24
 
 # Set Node.js 24 as default
 nvm alias default 24
-
-# Verify installation
