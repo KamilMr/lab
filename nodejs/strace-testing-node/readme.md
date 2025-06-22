@@ -10,5 +10,4 @@ From now on play with it
 ```bash
 # in  /app
 strace -f -t node <script name>
-
 ```
