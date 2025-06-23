@@ -26,6 +26,7 @@ client.on("listening", handleListening);
 //client.bind(55555)
 
 
+// Below code is used if you would want to specify server and set it permanently
 // client.connect( 3333,"127.0.0.1", () => {
   //notice that its called send and not write
   //because it is not a stream of bytes ..but an actual unit (message) we send
