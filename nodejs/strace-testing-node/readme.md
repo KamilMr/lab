@@ -1,4 +1,4 @@
-I've got to have docker installed.
+You need to have Docker installed.
 
 ```bash
 # I noticed there are some issues when building the image so sometimes it needs to be run twice. This
