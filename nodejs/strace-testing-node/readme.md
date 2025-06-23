@@ -1,3 +1,5 @@
+This repository was set up while following a course by Hussein Nasser on [Udemy](https://www.udemy.com/course/nodejs-internals-and-architecture). He used `strace` to trace system calls that processes make and receive. It is available on Linux. Since I am using a Mac, I use Docker for that.
+
 You need to have Docker installed.
 
 ```bash
