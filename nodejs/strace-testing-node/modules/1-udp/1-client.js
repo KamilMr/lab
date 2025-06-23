@@ -24,3 +24,10 @@ client.on("listening", handleListening);
 
 // However we can bind to a source port of our choosing, and for that uncomment the line below
 //client.bind(55555)
+
+
+// client.connect( 3333,"127.0.0.1", () => {
+  //notice that its called send and not write
+  //because it is not a stream of bytes ..but an actual unit (message) we send
+  // client.send("a whole message");
+// });
