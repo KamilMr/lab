@@ -1,25 +1,22 @@
-var ffprobe = require('ffprobe'),
-    ffprobeStatic = require('ffprobe-static');
+const {spawn}= require("child_process");
+const pathToFfmpeg = require("ffmpeg-ffprobe-static");
 
-ffprobe('./file.mp4', { path: ffprobeStatic.path })
-  .then(function (info) {
-    console.log(info);
-    /***
-    {
-        "streams": [
-            {
-                "index": 0,
-                "codec_name": "h264",
-                "codec_long_name": "H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10",
-                "profile": "High",
+const ffprobe = (path, args) => {
+    const child = spawn(pathToFfmpeg.ffprobePath,  [path, ...args]);
+    child.stdout.on("data", (data) => {
+        console.log(data.toString());
+    });
+    child.stderr.on("data", (data) => {
+        console.log(data.toString());
+    });
+};
 
-                ...
-                }
-            }
-        ]
-    }
-     **/
-  })
-  .catch(function (err) {
-    console.error(err);
-  })
+ffprobe("./BigBuckBunny.mp4",
+  [
+    "-select_streams",
+    "v",
+    "-show_entries",
+    "frame=pkt_size,pts_time",
+    "-of",
+    "json",
+  ]);
