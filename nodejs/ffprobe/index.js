@@ -74,17 +74,3 @@ ffprobe(path, [
   "-of",
   "csv=p=0",
 ]);
-
-// const child = spawn(pathToFfmpeg.ffprobePath, [path])
-
-// child.stdout.on("data", (buff) => {
-//   console.log(buff.toString());
-// });
-
-// child.stderr.on("data", (buff) => {
-//   console.log(buff.toString());
-// });
-
-// child.on("close", (code) => {
-//   console.log("close", code);
-// });
