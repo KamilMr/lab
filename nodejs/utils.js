@@ -59,3 +59,8 @@ const omitProperties = (collection, property) => {
     'map'
   ]
   const {data, missingKeys} = pickWithMissing(respW3W, requiredKeys)
+
+const getUtcDate = (date = new Date()) => {
+  const isoDate = date.toISOString();
+  return `${isoDate.substring(0, 10)} ${isoDate.substring(11, 19)}`;
+}
