@@ -64,6 +64,7 @@ const getUtcDate = (date = new Date()) => {
   const isoDate = date.toISOString();
   return `${isoDate.substring(0, 10)} ${isoDate.substring(11, 19)}`;
 }
+
 /*Basic checking if file is pdf*/
 const handleUploadStatement = async (req, res, next) => {
 
@@ -76,4 +77,19 @@ const handleUploadStatement = async (req, res, next) => {
   if (fileSignature !== '%PDF-') return next('not_pdf');
 
   res.ch.ok();
+};
+
+const pluckByKeys = (data = {}, keys = []) => {
+  // validate keys, has to be an array or string
+  if (!Array.isArray(keys) && typeof keys !== 'string') return data;
+
+  // also when no keys are provided skip
+  if (!keys.length) return data;
+  const dict = _.keys(data);
+
+  const requested = Array.isArray(keys) ? keys : keys.toString().split(',');
+  return requested.reduce((acc, v) => {
+    if (dict.includes(v)) acc[v] = data[v];
+    return acc;
+  }, {});
 };
