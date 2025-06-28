@@ -83,7 +83,7 @@ const iterateOverAll = (source, target, imageDirectory) => {
     const fileStream = fs.createReadStream(path.join(source, file), {
       encoding: "utf-8",
     });
-    const writeStream = fs.createWriteStream(path.join(target, file));
+    const writeStream = new WrtieToFile(path.join(target, file));
 
     const transformStream = new CustomTransformStream({
       searchPattern: /!\[\[(.*?)\]\]/g,
@@ -92,7 +92,7 @@ const iterateOverAll = (source, target, imageDirectory) => {
       imageDirectory,
     });
 
-    pipeline(fileStream, transformStream, writeStream, (err) => {
+    pipeline(fileStream, filterStream, transformStream, writeStream, (err) => {
       if (err) {
         console.error(`There is an error: ${err}`);
         process.exit(1);
