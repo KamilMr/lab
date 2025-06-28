@@ -1,7 +1,8 @@
 const fs = require("node:fs");
 const path = require("node:path");
-const { Transform } = require("node:stream");
+const { Transform, Writable } = require("node:stream");
 const { pipeline } = require("node:stream");
+const filterStream = require("./filter-draft");
 
 const IMAGE_ATTACHMENT_PATH = "attachments";
 
@@ -51,6 +52,21 @@ class CustomTransformStream extends Transform {
 
   _flush(cb) {
     this.push(this.tail);
+    cb();
+  }
+}
+
+class WrtieToFile extends Writable {
+  constructor(file) {
+    super(file);
+    this.file = file;
+    this.fd = null;
+  }
+
+  _write(chunk, enc, cb) {
+    if (chunk.toString() === '') return cb();
+    if (!this.fd) this.fd = fs.openSync(this.file, 'w');
+    fs.writeSync(this.fd, chunk);
     cb();
   }
 }
