@@ -69,3 +69,21 @@ const getLoggedInPage = async (username, password) => {
 
   return {browser, page};
 };
+const goAndWait = async (page, link) => {
+  //TODO rethink
+  try {
+    const resp = await page.goto(link, {
+      waitUntil: 'domcontentloaded',
+      timeout: 10000,
+    });
+    const finalUrl   = resp?.url() || link;
+    const redirected = finalUrl !== link;
+
+    // ensure the DOM is at least partially ready
+    await page.waitForSelector('body', {timeout: 10000}).catch(() => {});
+
+    return {finalUrl, redirected};
+  } catch (e) {
+    return {finalUrl: link, redirected: false};
+  }
+};
