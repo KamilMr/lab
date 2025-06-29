@@ -2,7 +2,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { Transform, Writable } = require("node:stream");
 const { pipeline } = require("node:stream");
-const filterStream = require("./filter-draft");
+const FilterStream = require("./filter-draft");
 
 const IMAGE_ATTACHMENT_PATH = "attachments";
 
@@ -91,6 +91,8 @@ const iterateOverAll = (source, target, imageDirectory) => {
       target,
       imageDirectory,
     });
+
+    const filterStream = new FilterStream();
 
     pipeline(fileStream, filterStream, transformStream, writeStream, (err) => {
       if (err) {
