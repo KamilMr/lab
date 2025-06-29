@@ -87,3 +87,8 @@ const goAndWait = async (page, link) => {
     return {finalUrl: link, redirected: false};
   }
 };
+
+const hasLinkQueryParams = link => {
+  return link.includes('?');
+};
+
