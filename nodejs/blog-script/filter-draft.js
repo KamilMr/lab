@@ -3,19 +3,20 @@ const {Transform} = require('node:stream');
 const searchString = /draft:/;
 let tail = '';
 
-const filterStream = new Transform({
-  defaultEncoding: 'utf-8',
-  transform(chunk, enc, cb) {
-
+class FilterStream extends Transform{
+  constructor(opt){
+    super(opt)
+  }
+  _transform(chunk, enc, cb) {
     tail += chunk.toString();
     cb();
-  },
-  flush(cb) {
+  }
+  _flush(cb) {
     const isThere = searchString.test(tail);
     if (!isThere) return this.push(tail);
     tail = '';
     cb();
-  },
-});
+  }
+};
 
-module.exports = filterStream
+module.exports = FilterStream;
