@@ -108,6 +108,18 @@ const hasLinkQueryParams = link => {
   return link.includes('?');
 };
 
+const scrapeAndSavePage = async (page, link) => {
+  let html;
+  try {
+    html = await page.content();
+  } catch (e) {
+    await page.waitForNavigation({timeout: 5000}).catch(() => {});
+    html = await page.content();
+  }
+  await getScreenshot(page, link, screenShotDir);
+  await writeFile(path.join(scrapedDir, `${cleanUrl(link)}.html`), html);
+};
+
 const isLinkValid = (link, depth, maxDepth, page) => {
   const tR = {
     isValid: true,
