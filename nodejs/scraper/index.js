@@ -92,3 +92,50 @@ const hasLinkQueryParams = link => {
   return link.includes('?');
 };
 
+const isLinkValid = (link, depth, maxDepth, page) => {
+  const tR = {
+    isValid: true,
+    message: '',
+  };
+  const retR = () => {
+    if (!tR.isValid) log(`[isLinkValid] [PAGE-${page.pageId}] ${tR.message}`);
+    return tR;
+  };
+  if (!link) {
+    tR.isValid = false;
+    tR.message = 'It is empty';
+    return retR();
+  }
+
+  if (depth > maxDepth) {
+    tR.isValid = false;
+    tR.message = `Link ${link} at depth ${depth} is too deep ${depth} > ${maxDepth}`;
+    return retR();
+  }
+
+  if (pageScraped.has(link)) {
+    tR.isValid = false;
+    tR.message = `Link ${link} at depth ${depth} has already been checked`;
+    return retR();
+  }
+
+  if (!validateLink(link)) {
+    tR.isValid = false;
+    tR.message = `Link ${link} at depth ${depth} is not a valid link`;
+    return retR();
+  }
+
+  if (!isSameOrigin(link, mainPage)) {
+    tR.isValid = false;
+    tR.message = `Link ${link} at depth ${depth} is not on the same origin`;
+    return retR();
+  }
+
+  if (hasLinkQueryParams(link)) {
+    tR.isValid = false;
+    tR.message = `Link ${link} at depth ${depth} has query params`;
+    return retR();
+  }
+
+  return retR();
+};
