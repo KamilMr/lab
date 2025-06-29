@@ -23,3 +23,13 @@ const waiters = [];
 let activePages = 0;
 let pageIdCounter = 0;
 
+const [mainPage, depth = 1, loginURL] = process.argv.slice(2);
+
+const log = logToFile(path.join(process.cwd(), LOG_DIR, `${cleanUrl(mainPage)}-log.txt`));
+
+const cookiesPath = path.join(process.cwd(), COOKIES_FILE);
+
+const pageScraped = new Set();
+
+let scrapedDir = '';
+let screenShotDir = '';
