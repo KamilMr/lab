@@ -33,3 +33,39 @@ const pageScraped = new Set();
 
 let scrapedDir = '';
 let screenShotDir = '';
+
+const getLoggedInPage = async (username, password) => {
+  const browser = await launchBrowser(HEADLESS);
+  const page = await browser.newPage();
+  // to be changed
+  await page.setUserAgent(
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
+  );
+
+  if (await isFileExists(cookiesPath)) {
+    const savedCookies = JSON.parse(await readFile(cookiesPath, 'utf8'));
+    await page.setCookie(...savedCookies);
+  }
+
+  // Check whether we are already logged-in by visiting any logged-in only page.
+  if (loginURL) {
+    await page.goto(loginURL, {waitUntil: 'networkidle2'});
+    const hasLoginForm = await page.$('#user_login'); //TODO be smarter
+
+  if (hasLoginForm) {
+    // Need to log in.
+    await page.type('#user_login', username, {delay: 20});
+    await page.type('#user_pass', password, {delay: 20});
+    await Promise.all([
+      page.click('.tml-button'),
+      page.waitForNavigation({waitUntil: 'networkidle2'}),
+    ]);
+
+    // Save fresh cookies for next time
+    const freshCookies = await page.cookies();
+    await writeFile(COOKIES_FILE, JSON.stringify(freshCookies, null, 2));
+  }
+  }
+
+  return {browser, page};
+};
