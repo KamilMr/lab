@@ -69,6 +69,22 @@ const getLoggedInPage = async (username, password) => {
 
   return {browser, page};
 };
+
+const getAllLinksFromPage = async page => {
+  const readLinks = () =>
+    page.$$eval('a', as => as.map(a => a.href));
+
+  try {
+    return await readLinks();
+  } catch (err) {
+    const msg = err?.message || '';
+    if (!msg.includes('Execution context was destroyed')) throw err;
+
+    await page.waitForNavigation({timeout: 5000}).catch(() => {});
+    return await readLinks();
+  }
+};
+
 const goAndWait = async (page, link) => {
   //TODO rethink
   try {
