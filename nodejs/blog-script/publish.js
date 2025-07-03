@@ -56,7 +56,7 @@ class CustomTransformStream extends Transform {
   }
 }
 
-class WrtieToFile extends Writable {
+class WriteToFile extends Writable {
   constructor(file) {
     super(file);
     this.file = file;
@@ -83,7 +83,7 @@ const iterateOverAll = (source, target, imageDirectory) => {
     const fileStream = fs.createReadStream(path.join(source, file), {
       encoding: "utf-8",
     });
-    const writeStream = new WrtieToFile(path.join(target, file));
+    const writeStream = new WriteToFile(path.join(target, file));
 
     const transformStream = new CustomTransformStream({
       searchPattern: /!\[\[(.*?)\]\]/g,

@@ -1,20 +1,19 @@
 const {Transform} = require('node:stream');
 
 const searchString = /draft:/;
-let tail = '';
-
 class FilterStream extends Transform{
   constructor(opt){
     super(opt)
+    this.tail = '';
   }
   _transform(chunk, enc, cb) {
-    tail += chunk.toString();
+    this.tail += chunk.toString();
     cb();
   }
   _flush(cb) {
-    const isThere = searchString.test(tail);
-    if (!isThere) return this.push(tail);
-    tail = '';
+    const isThere = searchString.test(this.tail);
+    if (!isThere) return this.push(this.tail);
+    this.tail = '';
     cb();
   }
 };
