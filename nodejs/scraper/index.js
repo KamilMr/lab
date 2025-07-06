@@ -192,3 +192,15 @@ const getPage = async browser => {
     waiters.push(res);
   });
 }
+
+const releasePage = page => {
+  pool.push(page); // mark idle
+  --activePages;
+
+  if (waiters.length && pool.length) {
+    ++activePages;
+    const waiter = waiters.shift();
+    const availablePage = pool.pop();
+    waiter(availablePage); // wake one waiter
+  }
+};
