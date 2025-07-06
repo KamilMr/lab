@@ -167,3 +167,28 @@ const isLinkValid = (link, depth, maxDepth, page) => {
 
   return retR();
 };
+
+const getPage = async browser => {
+  if (pool.length && activePages < POOL_SIZE) {
+    ++activePages;
+    const page = pool.pop();
+    return page;
+  }
+
+  if (activePages < POOL_SIZE) {
+    ++activePages;
+    const cookies = await readFile(cookiesPath, 'utf8');
+    const savedCookies = JSON.parse(cookies);
+    const page = await browser.newPage();
+
+    // Add unique identifier to the page
+    page.pageId = ++pageIdCounter;
+
+    await page.setCookie(...savedCookies);
+    return page;
+  }
+
+  return await new Promise(res => {
+    waiters.push(res);
+  });
+}
