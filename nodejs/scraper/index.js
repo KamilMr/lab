@@ -17,7 +17,7 @@ const SCRAPED_DIR = 'scraped-pages';
 const COOKIES_FILE = 'cookies.json';
 const LOG_DIR = 'logs';
 
-const POOL_SIZE = 8;
+const POOL_SIZE = 2;
 const pool = [];
 const waiters = [];
 let activePages = 0;
@@ -115,8 +115,8 @@ const scrapeAndSavePage = async (page, link) => {
   } catch (e) {
     await page.waitForNavigation({timeout: 5000}).catch(() => {});
     html = await page.content();
+    // await getScreenshot(page, link, screenShotDir);
   }
-  await getScreenshot(page, link, screenShotDir);
   await writeFile(path.join(scrapedDir, `${cleanUrl(link)}.html`), html);
 };
 
@@ -251,3 +251,35 @@ const crawlLinks = async (browser, link, depth, maxDepth, cb) => {
     }
   }
 };
+
+const main = async ({username, password, depth = 1}) => {
+  console.time('start all')
+  const {browser} = await getLoggedInPage(username, password);
+
+  scrapedDir = path.join(SCRAPED_DIR, cleanUrl(mainPage));
+  screenShotDir = path.join(scrapedDir, 'screenshots');
+
+  if (!(await isFileExists(scrapedDir))) {
+    await mkdir(screenShotDir, {recursive: true});
+  }
+
+  log(`[START] scraping ${mainPage} max depth: ${depth}`);
+  await crawlLinks(browser, mainPage, 0, depth, (depth) => {
+    log(`[END] scraping ${mainPage} at depth ${depth}`);
+  });
+
+  await browser.close();
+  log(`[SUMMARY] scraped ${pageScraped.size} pages`);
+  log(`[END] browser closed`);
+  console.timeEnd('start all')
+  const allLinks = Array.from(pageScraped);
+  await writeFile(path.join(scrapedDir, 'summary.txt'), allLinks.join('\n'));
+};
+
+if (require.main === module) {
+  main({
+    username: process.env.USER_WEB,
+    password: process.env.PASS_WEB,
+    depth,
+  }).catch(console.error);
+}
