@@ -204,3 +204,50 @@ const releasePage = page => {
     waiter(availablePage); // wake one waiter
   }
 };
+
+const crawlLinks = async (browser, link, depth, maxDepth, cb) => {
+  const page = await getPage(browser);
+
+  try {
+    const {finalUrl, redirected} = await goAndWait(page, link);
+    if (redirected) {
+      // return;            // don't scrape or recurse further
+    }
+    link = finalUrl;
+    if (!(await isFileExists(path.join(scrapedDir, `${cleanUrl(link)}.html`)))) {
+      await scrapeAndSavePage(page, link);
+    }
+
+    pageScraped.add(link);
+
+    if (depth === maxDepth) {
+      return; // reached leaf level
+    }
+
+    const links = await getAllLinksFromPage(page);
+
+    const filtered = links.filter(l => isLinkValid(l, depth + 1, maxDepth, page));
+
+    if (filtered.length > 0) {
+      const newTasks = filtered.map(l =>
+        crawlLinks(browser, l, depth + 1, maxDepth, ()=>{}),
+      );
+      releasePage(page);
+      await Promise.all(newTasks);
+    }
+  } catch (e) {
+    console.error(
+      `[crawlLinks] [PAGE-${page.pageId}] Error processing ${link}:`,
+      e,
+    );
+  } finally {
+    // Only release if we haven't already released it early
+    if (pool.indexOf(page) === -1) {
+      releasePage(page);
+    }
+
+    if (waiters.length === 0 && pool.length > 0) {
+      cb(depth);
+    }
+  }
+};
