@@ -1,4 +1,12 @@
 // divs-test JavaScript file
+
+// Color constants
+const COLORS = {
+    HOVER_BLUE: '#3498db',
+    WHITE: 'white',
+    DEFAULT: '' // Reset to original
+};
+
 const allEventsByClass = document.querySelectorAll('.event');
 
 const columns = document.querySelectorAll('.box');
@@ -9,15 +17,15 @@ const btn = document.querySelector('.btn');
 function handleColumnListeners() {
     columns.forEach(column => {
         column.addEventListener('mouseenter', function() {
-            this.style.backgroundColor = '#3498db';
-            this.style.color = 'white';
+            this.style.backgroundColor = COLORS.HOVER_BLUE;
+            this.style.color = COLORS.WHITE;
             // console.log('whatColumnIsOn', this.id);
         });
 
         // Mouse leave - restore original background color
         column.addEventListener('mouseleave', function() {
-            this.style.backgroundColor = ''; // Reset to original
-            this.style.color = '';
+            this.style.backgroundColor = COLORS.DEFAULT; // Reset to original
+            this.style.color = COLORS.DEFAULT;
         });
     });
 }
@@ -45,7 +53,6 @@ function dragElement(elmnt) {
         // Don't reset initialLeft here - keep the persistent value
         document.onmouseup = closeDragElement;
         document.onmousemove = elementDrag;
-        console.log('Drag started, initialLeft:', initialLeft)
     }
 
     let currentColumn = null;
@@ -72,12 +79,11 @@ function dragElement(elmnt) {
 
         // Detect which column the element is hovering over
         currentColumn = detectHoveringColumn(elmnt);
-        console.log(currentColumn)
         const allColumnsExceptCurrent = Array.from(columns).filter(column => column.id !== currentColumn.id);
         if (currentColumn) {
-            currentColumn.style.backgroundColor = '#3498db';
+            currentColumn.style.backgroundColor = COLORS.HOVER_BLUE;
             // set width of dragged element to the width of the current column
-            allColumnsExceptCurrent.forEach(column => column.style.backgroundColor = '');
+            allColumnsExceptCurrent.forEach(column => column.style.backgroundColor = COLORS.DEFAULT);
         }
     }
 
@@ -86,26 +92,23 @@ function dragElement(elmnt) {
 
         if (currentColumn && hasMoved) {
             centerDraggedElementInColumn(currentColumn, elmnt);
-            currentColumn.style.backgroundColor = '';
+            currentColumn.style.backgroundColor = COLORS.DEFAULT;
             // Update initialLeft to the new centered position
             initialLeft = elmnt.offsetLeft;
             initialTop = elmnt.offsetTop;
-            console.log('Updated initialLeft to:', initialLeft);
-        } else if (!hasMoved) {
-            // If we didn't actually drag, don't change the position
-            console.log('No movement detected, keeping original position');
         } else {
             elmnt.style.left = initialLeft + "px";
             elmnt.style.top = initialTop + "px";
         }
+
+        // clean up
         document.onmouseup = null;
         document.onmousemove = null;
     }
 }
 
 function centerDraggedElementInColumn(column, element) {
-    const distanceFromLeft = column.getBoundingClientRect().left;
-    const left = (distanceFromLeft) + "px";
+    const left = column.offsetLeft + "px";
     element.style.left = left;
 }
 
