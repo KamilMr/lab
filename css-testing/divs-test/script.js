@@ -36,9 +36,17 @@ function dragElement(elmnt) {
     let hasMoved = false; // Track if mouse has actually moved
     const DRAG_THRESHOLD = 5; // Minimum pixels to move before considering it a drag
 
+    // Function to update initial positions
+    function updateInitialPositions() {
+        initialLeft = elmnt.offsetLeft;
+        initialTop = elmnt.offsetTop;
+    }
+
     // Initialize initialLeft with current position
-    initialLeft = elmnt.offsetLeft;
-    initialTop = elmnt.offsetTop;
+    updateInitialPositions();
+
+    // Expose the update function so it can be called after resize
+    elmnt._dragUpdateInitialPositions = updateInitialPositions;
 
     elmnt.onmousedown = dragMouseDown;
 
@@ -152,6 +160,11 @@ window.addEventListener('resize', () => {
             centerDraggedElementInColumn(columns[0], el);
             fitElementToColumn(el, columns[0]);
         }
+
+        // Update the drag function's initial positions for this element
+        // We need to access the drag function's updateInitialPositions
+        if (el._dragUpdateInitialPositions) el._dragUpdateInitialPositions();
+
     });
 });
 
