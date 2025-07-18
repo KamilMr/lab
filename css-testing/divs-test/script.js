@@ -139,4 +139,27 @@ function detectHoveringColumn(elmnt) {
 }
 
 document.addEventListener('DOMContentLoaded', handleColumnListeners);
+window.addEventListener('resize', () => {
+    allEventsByClass.forEach(el => {
+        // Find which column the element is currently in
+        const currentColumn = detectHoveringColumn(el);
+        if (currentColumn) {
+            // Reposition and resize the element to fit the column
+            centerDraggedElementInColumn(currentColumn, el);
+            fitElementToColumn(el, currentColumn);
+        } else {
+            // If not in any column, default to first column
+            centerDraggedElementInColumn(columns[0], el);
+            fitElementToColumn(el, columns[0]);
+        }
+    });
+});
+
+// fit elements to column
+function fitElementToColumn(element, column) {
+    const columnWidth = column.getBoundingClientRect().width;
+    element.style.width = columnWidth + "px";
+}
+
+allEventsByClass.forEach(el => fitElementToColumn(el, columns[0]));
 allEventsByClass.forEach(el => dragElement(el));
