@@ -7,15 +7,27 @@ const COLORS = {
     DEFAULT: '' // Reset to original
 };
 
+const overlappingEvents = {};
+
 const allEventsByClass = document.querySelectorAll('.event');
 
-const columns = document.querySelectorAll('.box');
-const container = document.querySelector('.container');
-const btn = document.querySelector('.btn');
+const rawColumns = document.querySelectorAll('.box');
+const columns = Array.from(rawColumns).filter(column => column.id.startsWith('column'));
+const rawContainer = document.querySelector('.container');
+const container = Array.from(rawContainer)[0];
+
+columns.forEach(column => overlappingEvents[column.id] = []);
+console.log(JSON.stringify(overlappingEvents, null, 2))
+
+document.addEventListener('DOMContentLoaded', handleColumnListeners);
+window.addEventListener('resize', handleWindowResize);
+allEventsByClass.forEach(el => fitElementToColumn(el, rawColumns[0]));
+allEventsByClass.forEach(el => dragElement(el));
+
 
 // Change background color when mouse is over box
 function handleColumnListeners() {
-    columns.forEach(column => {
+    rawColumns.forEach(column => {
         column.addEventListener('mouseenter', function() {
             this.style.backgroundColor = COLORS.HOVER_BLUE;
             this.style.color = COLORS.WHITE;
@@ -87,7 +99,7 @@ function dragElement(elmnt) {
 
         // Detect which column the element is hovering over
         currentColumn = detectHoveringColumn(elmnt);
-        const allColumnsExceptCurrent = Array.from(columns).filter(column => column.id !== currentColumn.id);
+        const allColumnsExceptCurrent = Array.from(rawColumns).filter(column => column.id !== currentColumn.id);
         if (currentColumn) {
             currentColumn.style.backgroundColor = COLORS.HOVER_BLUE;
             // set width of dragged element to the width of the current column
@@ -126,7 +138,7 @@ function detectHoveringColumn(elmnt) {
     const draggedCenterX = draggedRect.left + draggedRect.width / 2;
 
     // Get all boxes except the dragged element itself
-    const columnBoxes = Array.from(columns).filter(column => column.id !== elmnt.id);
+    const columnBoxes = Array.from(rawColumns).filter(column => column.id !== elmnt.id);
 
     for (let i = 0; i < columnBoxes.length; i++) {
         const boxRect = columnBoxes[i].getBoundingClientRect();
@@ -146,8 +158,7 @@ function detectHoveringColumn(elmnt) {
     return 0;
 }
 
-document.addEventListener('DOMContentLoaded', handleColumnListeners);
-window.addEventListener('resize', () => {
+function handleWindowResize () {
     allEventsByClass.forEach(el => {
         // Find which column the element is currently in
         const currentColumn = detectHoveringColumn(el);
@@ -157,8 +168,8 @@ window.addEventListener('resize', () => {
             fitElementToColumn(el, currentColumn);
         } else {
             // If not in any column, default to first column
-            centerDraggedElementInColumn(columns[0], el);
-            fitElementToColumn(el, columns[0]);
+            centerDraggedElementInColumn(rawColumns[0], el);
+            fitElementToColumn(el, rawColumns[0]);
         }
 
         // Update the drag function's initial positions for this element
@@ -166,7 +177,7 @@ window.addEventListener('resize', () => {
         if (el._dragUpdateInitialPositions) el._dragUpdateInitialPositions();
 
     });
-});
+}
 
 // fit elements to column
 function fitElementToColumn(element, column) {
@@ -174,5 +185,17 @@ function fitElementToColumn(element, column) {
     element.style.width = columnWidth + "px";
 }
 
-allEventsByClass.forEach(el => fitElementToColumn(el, columns[0]));
-allEventsByClass.forEach(el => dragElement(el));
+function addEventToColumn(event, column) {
+    overlappingEvents[column.id].push(event);
+}
+
+function removeEventFromColumn(event, column) {
+    overlappingEvents[column.id] = overlappingEvents[column.id].filter(e => e !== event);
+}
+
+function checkForOverlappingEvents(event, column) {
+    const eventRect = event.getBoundingClientRect();
+    const columnRect = column.getBoundingClientRect();
+    return eventRect.left < columnRect.right && eventRect.right > columnRect.left && eventRect.top < columnRect.bottom && eventRect.bottom > columnRect.top;
+}
+
