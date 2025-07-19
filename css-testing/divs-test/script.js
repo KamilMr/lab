@@ -2,200 +2,378 @@
 
 // Color constants
 const COLORS = {
-    HOVER_BLUE: '#3498db',
-    WHITE: 'white',
-    DEFAULT: '' // Reset to original
+  HOVER_BLUE: '#3498db',
+  WHITE: 'white',
+  DEFAULT: '', // Reset to original
 };
 
-const overlappingEvents = {};
+/**
+ * Stores event data for each column, including their positions and references.
+ *
+ * @typedef {Object} OverlappingEvent
+ * @property {number} top - The top position of the event (in pixels).
+ * @property {number} bottom - The bottom position of the event (in pixels).
+ * @property {string} id - The unique identifier for the event.
+ * @property {Event} event - The event DOM element.
+ */
+
+/**
+ * @type {Object.<string, OverlappingEvent[]>}
+ * @description
+ * An object where each key is a column ID and the value is an array of OverlappingEvent objects.
+ * Example:
+ * {
+ *   columnId: [
+ *     { top: 10, bottom: 50, id: 'event1', event: HTMLElement },
+ *     { top: 60, bottom: 100, id: 'event2', event: HTMLElement }
+ *   ]
+ * }
+ */
+const columnObserver = {
+  /**
+   * @type {Object.<string, Object<string, string[]>>}
+   * @private
+   * @description
+   * Internal storage for overlapped event groups by column.
+   * Each key is a column ID, and the value is an object where each property is an array of event IDs that overlap.
+   * Example:
+   * {
+   *   columnId: {
+   *     ids: ['event1', 'event2'],
+   *     ano: ['event3', 'event4', 'event5']
+   *   }
+   * }
+   */
+  _overlappedEvents: {},
+};
+
+const oem = {};
+oem.addEventToColumn = function (event, column) {
+  const rect = event.getBoundingClientRect();
+  oem.removeEventFromColumns(event);
+  columnObserver[column.id].push({
+    top: rect.top,
+    bottom: rect.bottom,
+    id: event.id,
+    event: event,
+  });
+
+  // Check for overlaps and get wrapper dimensions if needed
+  const overlappingIds = oem.getOverlappingEventsFromColumn(
+    event.id,
+    column.id,
+  );
+  if (overlappingIds) {
+    // Add the current event to the overlapping group
+    const allOverlappingIds = [...overlappingIds, event.id];
+    oem.addToOverlapped(column.id, allOverlappingIds);
+  }
+
+  console.log(
+    'When added: ',
+    JSON.stringify(columnObserver._overlappedEvents, null, 2),
+  );
+};
+
+oem.removeEventFromColumns = function (event) {
+  Object.keys(columnObserver)
+    .filter(key => key.startsWith('column'))
+    .forEach(key => {
+      const columnEvents = columnObserver[key];
+      if (columnEvents) {
+        const eventIndex = columnEvents.findIndex(e => e.id === event.id);
+        if (eventIndex !== -1) {
+          // Remove from overlap management before removing from column
+          oem.removeFromOverlapped(event.id);
+          // Remove from column events
+          columnObserver[key] = columnEvents.filter(e => e.id !== event.id);
+        }
+      }
+    });
+};
+
+oem.getOverlappedFromColumn = function (cId) {
+  return columnObserver[cId];
+};
+
+oem.get3CharId = function () {
+  // get all ids present inside _overlappedEvents
+  const existingIds = new Set();
+  Object.values(columnObserver._overlappedEvents).forEach(columnGroups => {
+    Object.keys(columnGroups).forEach(groupId => {
+      existingIds.add(groupId);
+    });
+  });
+
+  // create unique id
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let newId;
+  do {
+    newId = '';
+    for (let i = 0; i < 3; i++) {
+      newId += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+  } while (existingIds.has(newId));
+
+  // return id
+  return newId;
+};
+
+oem.addToOverlapped = function (cId, eIds) {
+  // get overlappedEvents
+  if (!columnObserver._overlappedEvents[cId]) {
+    columnObserver._overlappedEvents[cId] = {};
+  }
+
+  // check if any of those eIds are present there
+  const existingGroups = Object.entries(columnObserver._overlappedEvents[cId]);
+  const groupsToRemove = [];
+
+  existingGroups.forEach(([groupId, groupEventIds]) => {
+    const hasOverlap = eIds.some(eId => groupEventIds.includes(eId));
+    if (hasOverlap) {
+      groupsToRemove.push(groupId);
+    }
+  });
+
+  // if there are present remove this whole property that stores them
+  groupsToRemove.forEach(groupId => {
+    delete columnObserver._overlappedEvents[cId][groupId];
+  });
+
+  // append new id with new eIds
+  const newGroupId = oem.get3CharId();
+  columnObserver._overlappedEvents[cId][newGroupId] = eIds;
+};
+
+oem.removeFromOverlapped = function (eId) {
+  // else search for path where it is located
+  Object.keys(columnObserver._overlappedEvents).forEach(cId => {
+    const columnGroups = columnObserver._overlappedEvents[cId];
+    Object.keys(columnGroups).forEach(groupId => {
+        // basic check remove all empty groups
+      const eventIds = columnGroups[groupId].filter(id => id !== eId);
+      if (eventIds.length <= 1) delete columnObserver._overlappedEvents[cId][groupId];
+      else columnObserver._overlappedEvents[cId][groupId] = eventIds;
+    });
+
+    // if column has no groups remove it
+    if (!Object.keys(columnGroups).length) delete columnObserver._overlappedEvents[cId];
+  });
+};
+
+oem.getOverlappingEventsFromColumn = function (eId, columnId) {
+  // get column id events
+  const columnEvents = columnObserver[columnId] || [];
+  const targetEvent = columnEvents.find(e => e.id === eId);
+
+  if (!targetEvent) return undefined;
+
+  // iterate over them and if cross return all event Id it crosses with
+  const overlappingIds = [];
+  columnEvents.forEach(event => {
+    if (event.id !== eId) {
+      // Check if events overlap vertically
+      const overlaps = !(
+        targetEvent.bottom <= event.top || targetEvent.top >= event.bottom
+      );
+      if (overlaps) {
+        overlappingIds.push(event.id);
+      }
+    }
+  });
+
+  // return output is undefined when ok or array of strings
+  return overlappingIds.length > 0 ? overlappingIds : undefined;
+};
 
 const allEventsByClass = document.querySelectorAll('.event');
 
 const rawColumns = document.querySelectorAll('.box');
-const columns = Array.from(rawColumns).filter(column => column.id.startsWith('column'));
+const columns = Array.from(rawColumns).filter(column =>
+  column.id.startsWith('column'),
+);
 const rawContainer = document.querySelector('.container');
 const container = Array.from(rawContainer)[0];
 
-columns.forEach(column => overlappingEvents[column.id] = []);
-console.log(JSON.stringify(overlappingEvents, null, 2))
+// register columns
+columns.forEach(column => (columnObserver[column.id] = []));
+console.log(JSON.stringify(columnObserver, null, 2));
 
 document.addEventListener('DOMContentLoaded', handleColumnListeners);
 window.addEventListener('resize', handleWindowResize);
 allEventsByClass.forEach(el => fitElementToColumn(el, rawColumns[0]));
-allEventsByClass.forEach(el => dragElement(el));
+allEventsByClass.forEach(el => attachDraggingHandlers(el));
 
-
-// Change background color when mouse is over box
+// handlers of events
 function handleColumnListeners() {
-    rawColumns.forEach(column => {
-        column.addEventListener('mouseenter', function() {
-            this.style.backgroundColor = COLORS.HOVER_BLUE;
-            this.style.color = COLORS.WHITE;
-            // console.log('whatColumnIsOn', this.id);
-        });
-
-        // Mouse leave - restore original background color
-        column.addEventListener('mouseleave', function() {
-            this.style.backgroundColor = COLORS.DEFAULT; // Reset to original
-            this.style.color = COLORS.DEFAULT;
-        });
+  rawColumns.forEach(column => {
+    column.addEventListener('mouseenter', function () {
+      this.style.backgroundColor = COLORS.HOVER_BLUE;
+      this.style.color = COLORS.WHITE;
+      // console.log('whatColumnIsOn', this.id);
     });
+
+    // Mouse leave - restore original background color
+    column.addEventListener('mouseleave', function () {
+      this.style.backgroundColor = COLORS.DEFAULT; // Reset to original
+      this.style.color = COLORS.DEFAULT;
+    });
+  });
 }
 
-function dragElement(elmnt) {
-    let isDragging = false;
-    let startX, startY, initialLeft, initialTop;
-    let hasMoved = false; // Track if mouse has actually moved
-    const DRAG_THRESHOLD = 5; // Minimum pixels to move before considering it a drag
-
-    // Function to update initial positions
-    function updateInitialPositions() {
-        initialLeft = elmnt.offsetLeft;
-        initialTop = elmnt.offsetTop;
+function handleWindowResize() {
+  allEventsByClass.forEach(el => {
+    // Find which column the element is currently in
+    const currentColumn = detectHoveredColumn(el);
+    if (currentColumn) {
+      // Reposition and resize the element to fit the column
+      centerDraggedElementInColumn(currentColumn, el);
+      fitElementToColumn(el, currentColumn);
+    } else {
+      // If not in any column, default to first column
+      centerDraggedElementInColumn(rawColumns[0], el);
+      fitElementToColumn(el, rawColumns[0]);
     }
 
-    // Initialize initialLeft with current position
-    updateInitialPositions();
+    // Update the drag function's initial positions for this element
+    // We need to access the drag function's updateInitialPositions
+    if (el._dragUpdateInitialPositions) el._dragUpdateInitialPositions();
+  });
+}
 
-    // Expose the update function so it can be called after resize
-    elmnt._dragUpdateInitialPositions = updateInitialPositions;
+// attach some handlers to the element
+function attachDraggingHandlers(elmnt) {
+  let isDragging = false;
+  let startX, startY, initialLeft, initialTop;
+  let hasMoved = false; // Track if mouse has actually moved
+  const DRAG_THRESHOLD = 5; // Minimum pixels to move before considering it a drag
 
-    elmnt.onmousedown = dragMouseDown;
+  // Function to update initial positions
+  function updateInitialPositions() {
+    initialLeft = elmnt.offsetLeft;
+    initialTop = elmnt.offsetTop;
+  }
 
-    function dragMouseDown(e) {
-        e = e || window.event;
-        e.preventDefault();
+  // Initialize initialLeft with current position
+  updateInitialPositions();
 
-        isDragging = true;
-        hasMoved = false;
-        startX = e.clientX;
-        startY = e.clientY;
-        // Don't reset initialLeft here - keep the persistent value
-        document.onmouseup = closeDragElement;
-        document.onmousemove = elementDrag;
+  // Expose the update function so it can be called after resize
+  elmnt._dragUpdateInitialPositions = updateInitialPositions;
+
+  elmnt.onmousedown = dragMouseDown;
+
+  // detect event currently in column
+  if (detectHoveredColumn(elmnt))
+    oem.addEventToColumn(elmnt, detectHoveredColumn(elmnt));
+
+  function dragMouseDown(e) {
+    e = e || window.event;
+    e.preventDefault();
+
+    isDragging = true;
+    hasMoved = false;
+    startX = e.clientX;
+    startY = e.clientY;
+    // Don't reset initialLeft here - keep the persistent value
+    document.onmouseup = closeDragElement;
+    document.onmousemove = elementDrag;
+  }
+
+  let currentColumn = null;
+  function elementDrag(e) {
+    e = e || window.event;
+    e.preventDefault();
+
+    if (!isDragging) return;
+
+    const deltaX = e.clientX - startX;
+    const deltaY = e.clientY - startY;
+
+    // Check if mouse has moved enough to be considered a drag
+    const totalMovement = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+    if (totalMovement > DRAG_THRESHOLD) {
+      hasMoved = true;
     }
 
-    let currentColumn = null;
-    function elementDrag(e) {
-        e = e || window.event;
-        e.preventDefault();
-
-        if (!isDragging) return;
-
-        const deltaX = e.clientX - startX;
-        const deltaY = e.clientY - startY;
-
-        // Check if mouse has moved enough to be considered a drag
-        const totalMovement = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-        if (totalMovement > DRAG_THRESHOLD) {
-            hasMoved = true;
-        }
-
-        // Only update position if we've actually moved
-        if (hasMoved) {
-            elmnt.style.left = (initialLeft + deltaX) + "px";
-            elmnt.style.top = (initialTop + deltaY) + "px";
-        }
-
-        // Detect which column the element is hovering over
-        currentColumn = detectHoveringColumn(elmnt);
-        const allColumnsExceptCurrent = Array.from(rawColumns).filter(column => column.id !== currentColumn.id);
-        if (currentColumn) {
-            currentColumn.style.backgroundColor = COLORS.HOVER_BLUE;
-            // set width of dragged element to the width of the current column
-            allColumnsExceptCurrent.forEach(column => column.style.backgroundColor = COLORS.DEFAULT);
-        }
+    // Only update position if we've actually moved
+    if (hasMoved) {
+      elmnt.style.left = initialLeft + deltaX + 'px';
+      elmnt.style.top = initialTop + deltaY + 'px';
     }
 
-    function closeDragElement() {
-        isDragging = false;
-
-        if (currentColumn && hasMoved) {
-            centerDraggedElementInColumn(currentColumn, elmnt);
-            currentColumn.style.backgroundColor = COLORS.DEFAULT;
-            // Update initialLeft to the new centered position
-            initialLeft = elmnt.offsetLeft;
-            initialTop = elmnt.offsetTop;
-        } else {
-            elmnt.style.left = initialLeft + "px";
-            elmnt.style.top = initialTop + "px";
-        }
-
-        // clean up
-        document.onmouseup = null;
-        document.onmousemove = null;
+    // Detect which column the element is hovering over
+    currentColumn = detectHoveredColumn(elmnt);
+    const allColumnsExceptCurrent = Array.from(rawColumns).filter(
+      column => column.id !== currentColumn.id,
+    );
+    if (currentColumn) {
+      currentColumn.style.backgroundColor = COLORS.HOVER_BLUE;
+      // set width of dragged element to the width of the current column
+      allColumnsExceptCurrent.forEach(
+        column => (column.style.backgroundColor = COLORS.DEFAULT),
+      );
     }
+  }
+
+  function closeDragElement() {
+    isDragging = false;
+
+    if (currentColumn && hasMoved) {
+      centerDraggedElementInColumn(currentColumn, elmnt);
+      currentColumn.style.backgroundColor = COLORS.DEFAULT;
+      // Update initialLeft to the new centered position
+      initialLeft = elmnt.offsetLeft;
+      initialTop = elmnt.offsetTop;
+
+      // add event to column
+      oem.addEventToColumn(elmnt, currentColumn);
+    } else {
+      elmnt.style.left = initialLeft + 'px';
+      elmnt.style.top = initialTop + 'px';
+    }
+
+    // clean up
+    document.onmouseup = null;
+    document.onmousemove = null;
+  }
 }
 
 function centerDraggedElementInColumn(column, element) {
-    const left = column.offsetLeft + "px";
-    element.style.left = left;
+  const left = column.offsetLeft + 'px';
+  element.style.left = left;
 }
 
 // Function to detect which column the dragged element is hovering over
-function detectHoveringColumn(elmnt) {
-    const draggedRect = elmnt.getBoundingClientRect();
-    const draggedCenterX = draggedRect.left + draggedRect.width / 2;
+function detectHoveredColumn(elmnt) {
+  const draggedRect = elmnt.getBoundingClientRect();
+  const draggedCenterX = draggedRect.left + draggedRect.width / 2;
 
-    // Get all boxes except the dragged element itself
-    const columnBoxes = Array.from(rawColumns).filter(column => column.id !== elmnt.id);
+  // Get all boxes except the dragged element itself
+  const columnBoxes = Array.from(rawColumns).filter(
+    column => column.id !== elmnt.id,
+  );
 
-    for (let i = 0; i < columnBoxes.length; i++) {
-        const boxRect = columnBoxes[i].getBoundingClientRect();
+  for (let i = 0; i < columnBoxes.length; i++) {
+    const boxRect = columnBoxes[i].getBoundingClientRect();
 
-        // Check if the center of the dragged element is within this column
-        if (draggedCenterX >= boxRect.left && draggedCenterX <= boxRect.right) {
-            // verify top bottom of dragged element is within the column
-            const draggedTop = draggedRect.top;
-            const draggedBottom = draggedRect.bottom;
-            const columnTop = boxRect.top;
-            const columnBottom = boxRect.bottom;
-            if (draggedTop >= columnTop && draggedBottom <= columnBottom) {
-                return columnBoxes[i];
-            }
-        }
+    // Check if the center of the dragged element is within this column
+    if (draggedCenterX >= boxRect.left && draggedCenterX <= boxRect.right) {
+      // verify top bottom of dragged element is within the column
+      const draggedTop = draggedRect.top;
+      const draggedBottom = draggedRect.bottom;
+      const columnTop = boxRect.top;
+      const columnBottom = boxRect.bottom;
+      if (draggedTop >= columnTop && draggedBottom <= columnBottom) {
+        return columnBoxes[i];
+      }
     }
-    return 0;
-}
-
-function handleWindowResize () {
-    allEventsByClass.forEach(el => {
-        // Find which column the element is currently in
-        const currentColumn = detectHoveringColumn(el);
-        if (currentColumn) {
-            // Reposition and resize the element to fit the column
-            centerDraggedElementInColumn(currentColumn, el);
-            fitElementToColumn(el, currentColumn);
-        } else {
-            // If not in any column, default to first column
-            centerDraggedElementInColumn(rawColumns[0], el);
-            fitElementToColumn(el, rawColumns[0]);
-        }
-
-        // Update the drag function's initial positions for this element
-        // We need to access the drag function's updateInitialPositions
-        if (el._dragUpdateInitialPositions) el._dragUpdateInitialPositions();
-
-    });
+  }
+  return 0;
 }
 
 // fit elements to column
 function fitElementToColumn(element, column) {
-    const columnWidth = column.getBoundingClientRect().width;
-    element.style.width = columnWidth + "px";
+  const columnWidth = column.getBoundingClientRect().width;
+  element.style.width = columnWidth + 'px';
 }
-
-function addEventToColumn(event, column) {
-    overlappingEvents[column.id].push(event);
-}
-
-function removeEventFromColumn(event, column) {
-    overlappingEvents[column.id] = overlappingEvents[column.id].filter(e => e !== event);
-}
-
-function checkForOverlappingEvents(event, column) {
-    const eventRect = event.getBoundingClientRect();
-    const columnRect = column.getBoundingClientRect();
-    return eventRect.left < columnRect.right && eventRect.right > columnRect.left && eventRect.top < columnRect.bottom && eventRect.bottom > columnRect.top;
-}
-
