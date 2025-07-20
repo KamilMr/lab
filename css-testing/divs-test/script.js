@@ -117,6 +117,22 @@ oem.get3CharId = function () {
   return newId;
 };
 
+oem._updateWidthOfElements = function (elements, column) {
+  const numberOfElements = elements.length;
+  const columnWidth = column.getBoundingClientRect().width;
+  const columnOffset = column.offsetLeft; // Use offsetLeft instead of getBoundingClientRect().left
+
+  // calculate left offset of elements
+  elements.forEach((id, idx) => {
+    const elementDom = oem.getEventById(id).event;
+    const offset = idx * (columnWidth / numberOfElements) + columnOffset;
+    elementDom.style.width = columnWidth / numberOfElements + 'px';
+    elementDom.style.left = offset + 'px';
+
+    elementDom._dragUpdateInitialPositions();
+  });
+}
+
 oem.addToOverlapped = function (cId, eIds) {
   // get overlappedEvents
   if (!columnObserver._overlappedEvents[cId]) {
@@ -203,6 +219,51 @@ oem.getColIdEvIsLoc = function (eId) {
   return column;
 };
 
+// Unified layout refresh function
+oem.refreshLayout = function (columnIds = Object.keys(columnObserver).filter(c => !c.startsWith('_'))) {
+  columnIds.forEach(columnId => {
+    const eventsInColumn = columnObserver[columnId];
+    if (!eventsInColumn) return;
+
+    // get overlapped events
+    const checkEvents = [];
+    eventsInColumn.forEach(event => {
+      if (checkEvents.flat().includes(event.id)) return;
+
+      const overlaps = oem.getOverlappingEventsFromColumn(event.id, columnId);
+      if (overlaps) {
+        const overlapss = overlaps.concat(event.id);
+        // sort by left offset
+        const sorted = overlapss.sort(
+          (a, b) =>
+            oem.getEventById(a).event.getBoundingClientRect().left -
+            oem.getEventById(b).event.getBoundingClientRect().left,
+        );
+        checkEvents.push(sorted);
+      } else checkEvents.push([event.id]);
+    });
+
+    checkEvents.forEach(gr =>
+      oem._updateWidthOfElements(
+        gr,
+        columns.find(col => col.id === columnId),
+      ),
+    );
+  });
+};
+
+// helper functions
+oem._centerDraggedElementInColumn = function (column, element) {
+  const left = column.offsetLeft + 'px';
+  element.style.left = left;
+}
+
+// fit elements to column
+oem._fitElementToColumn = function (element, column) {
+  const columnWidth = column.getBoundingClientRect().width;
+  element.style.width = columnWidth + 'px';
+}
+
 const allEventsByClass = document.querySelectorAll('.event');
 
 const rawColumns = document.querySelectorAll('.box');
@@ -220,8 +281,7 @@ window.addEventListener('resize', handleWindowResize);
 allEventsByClass.forEach(el => attachDraggingHandlers(el));
 
 // Initialize overlapping groups
-const groups = oem.getAllOverlappedGroups();
-groups.forEach(el => updateWidthOfElements(el, columns[0]));
+oem.refreshLayout();
 
 // handlers of events
 function handleColumnListeners() {
@@ -245,18 +305,21 @@ function handleWindowResize() {
     const currentColumn = detectHoveredColumn(el);
     if (currentColumn) {
       // Reposition and resize the element to fit the column
-      centerDraggedElementInColumn(currentColumn, el);
-      fitElementToColumn(el, currentColumn);
+      oem._centerDraggedElementInColumn(currentColumn, el);
+      oem._fitElementToColumn(el, currentColumn);
     } else {
       // If not in any column, default to first column
-      centerDraggedElementInColumn(rawColumns[0], el);
-      fitElementToColumn(el, rawColumns[0]);
+      oem._centerDraggedElementInColumn(rawColumns[0], el);
+      oem._fitElementToColumn(el, rawColumns[0]);
     }
 
     // Update the drag function's initial positions for this element
     // We need to access the drag function's updateInitialPositions
     if (el._dragUpdateInitialPositions) el._dragUpdateInitialPositions();
   });
+
+  // Refresh layout for all columns after resize
+  oem.refreshLayout();
 }
 
 // attach some handlers to the element
@@ -341,7 +404,7 @@ function attachDraggingHandlers(box) {
       oem.addEventToColumn(box, currentColumn);
       const toUpdate = [currentColumn.id];
       if (currentColumn.id !== columnCameFrom) toUpdate.push(columnCameFrom);
-      getOverlapsAndUpdateWidth(toUpdate);
+      oem.refreshLayout(toUpdate);
 
       currentColumn.style.backgroundColor = COLORS.DEFAULT;
       // Update initialLeft to the new centered position
@@ -357,12 +420,6 @@ function attachDraggingHandlers(box) {
     document.onmousemove = null;
     currentColumn = null;
   }
-}
-
-// helper functions
-function centerDraggedElementInColumn(column, element) {
-  const left = column.offsetLeft + 'px';
-  element.style.left = left;
 }
 
 // Function to detect which column the dragged element is hovering over
@@ -391,57 +448,4 @@ function detectHoveredColumn(elmnt) {
     }
   }
   return null;
-}
-
-// fit elements to column
-function fitElementToColumn(element, column) {
-  const columnWidth = column.getBoundingClientRect().width;
-  element.style.width = columnWidth + 'px';
-}
-
-function getOverlapsAndUpdateWidth(arrayOfCols) {
-  arrayOfCols.forEach(columnId => {
-    const eventsInColumn = columnObserver[columnId];
-    // get left offset of column
-    // get overlapped events
-    const checkEvents = [];
-    eventsInColumn.forEach(event => {
-      if (checkEvents.flat().includes(event.id)) return;
-
-      const overlaps = oem.getOverlappingEventsFromColumn(event.id, columnId);
-      if (overlaps) {
-        const overlapss = overlaps.concat(event.id);
-        // sort by left offset
-        const sorted = overlapss.sort(
-          (a, b) =>
-            oem.getEventById(a).event.getBoundingClientRect().left -
-            oem.getEventById(b).event.getBoundingClientRect().left,
-        );
-        checkEvents.push(sorted);
-      } else checkEvents.push([event.id]);
-    });
-
-    checkEvents.forEach(gr =>
-      updateWidthOfElements(
-        gr,
-        columns.find(col => col.id === columnId),
-      ),
-    );
-  });
-}
-
-function updateWidthOfElements(elements, column) {
-  const numberOfElements = elements.length;
-  const columnWidth = column.getBoundingClientRect().width;
-  const columnOffset = column.offsetLeft; // Use offsetLeft instead of getBoundingClientRect().left
-
-  // calculate left offset of elements
-  elements.forEach((id, idx) => {
-    const elementDom = oem.getEventById(id).event;
-    const offset = idx * (columnWidth / numberOfElements) + columnOffset;
-    elementDom.style.width = columnWidth / numberOfElements + 'px';
-    elementDom.style.left = offset + 'px';
-
-    elementDom._dragUpdateInitialPositions();
-  });
 }
