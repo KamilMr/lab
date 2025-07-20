@@ -1,7 +1,7 @@
 // divs-test JavaScript file
 
 // Import the Overlapping Event Manager
-import { oem, COLORS } from './event-manager.js';
+import {oem, COLORS} from './event-manager.js';
 
 const allEventsByClass = document.querySelectorAll('.event');
 const rawColumns = document.querySelectorAll('.box');

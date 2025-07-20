@@ -210,7 +210,9 @@ oem.getColIdEvIsLoc = function (eId) {
 };
 
 // Unified layout refresh function
-oem.refreshLayout = function (columnIds = Object.keys(columnObserver).filter(c => !c.startsWith('_'))) {
+oem.refreshLayout = function (
+  columnIds = Object.keys(columnObserver).filter(c => !c.startsWith('_')),
+) {
   columnIds.forEach(columnId => {
     const eventsInColumn = columnObserver[columnId];
     if (!eventsInColumn) return;
@@ -262,4 +264,4 @@ oem.initializeColumns = function (columns) {
 };
 
 // Export the OEM module
-export { oem, COLORS };
+export {oem, COLORS};
