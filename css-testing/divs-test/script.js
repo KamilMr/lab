@@ -71,7 +71,7 @@ oem.addEventToColumn = function (event, column) {
 
   console.log(
     'When added: ',
-    JSON.stringify(columnObserver._overlappedEvents, null, 2),
+    JSON.stringify(columnObserver, null, 2),
   );
 };
 
@@ -193,17 +193,20 @@ const rawColumns = document.querySelectorAll('.box');
 const columns = Array.from(rawColumns).filter(column =>
   column.id.startsWith('column'),
 );
-const rawContainer = document.querySelector('.container');
-const container = Array.from(rawContainer)[0];
 
-// register columns
+const rawContainer = document.querySelector('.container');
+const rootContainer = Array.from(rawContainer)[0];
+
+// register columns in columnObserver
 columns.forEach(column => (columnObserver[column.id] = []));
 console.log(JSON.stringify(columnObserver, null, 2));
 
+// register listeners 
 document.addEventListener('DOMContentLoaded', handleColumnListeners);
 window.addEventListener('resize', handleWindowResize);
-allEventsByClass.forEach(el => fitElementToColumn(el, rawColumns[0]));
 allEventsByClass.forEach(el => attachDraggingHandlers(el));
+
+allEventsByClass.forEach(el => fitElementToColumn(el, rawColumns[0]));
 
 // handlers of events
 function handleColumnListeners() {
@@ -243,7 +246,7 @@ function handleWindowResize() {
 }
 
 // attach some handlers to the element
-function attachDraggingHandlers(elmnt) {
+function attachDraggingHandlers(box) {
   let isDragging = false;
   let startX, startY, initialLeft, initialTop;
   let hasMoved = false; // Track if mouse has actually moved
@@ -251,21 +254,21 @@ function attachDraggingHandlers(elmnt) {
 
   // Function to update initial positions
   function updateInitialPositions() {
-    initialLeft = elmnt.offsetLeft;
-    initialTop = elmnt.offsetTop;
+    initialLeft = box.offsetLeft; // from parrent div, padding included
+    initialTop = box.offsetTop;
   }
 
   // Initialize initialLeft with current position
   updateInitialPositions();
 
   // Expose the update function so it can be called after resize
-  elmnt._dragUpdateInitialPositions = updateInitialPositions;
+  box._dragUpdateInitialPositions = updateInitialPositions;
 
-  elmnt.onmousedown = dragMouseDown;
+  box.onmousedown = dragMouseDown;
 
   // detect event currently in column
-  if (detectHoveredColumn(elmnt))
-    oem.addEventToColumn(elmnt, detectHoveredColumn(elmnt));
+  const currentHoveredCol = detectHoveredColumn(box);
+  if (currentHoveredCol) oem.addEventToColumn(box, currentHoveredCol);
 
   function dragMouseDown(e) {
     e = e || window.event;
@@ -275,7 +278,8 @@ function attachDraggingHandlers(elmnt) {
     hasMoved = false;
     startX = e.clientX;
     startY = e.clientY;
-    // Don't reset initialLeft here - keep the persistent value
+
+    // register handlers end of movement and movement
     document.onmouseup = closeDragElement;
     document.onmousemove = elementDrag;
   }
@@ -292,19 +296,19 @@ function attachDraggingHandlers(elmnt) {
 
     // Check if mouse has moved enough to be considered a drag
     const totalMovement = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-    if (totalMovement > DRAG_THRESHOLD) {
-      hasMoved = true;
-    }
+    if (totalMovement > DRAG_THRESHOLD) hasMoved = true;
+    
 
     // Only update position if we've actually moved
     if (hasMoved) {
-      elmnt.style.left = initialLeft + deltaX + 'px';
-      elmnt.style.top = initialTop + deltaY + 'px';
+      // we add padding + movement calculation
+      box.style.left = initialLeft + deltaX + 'px';
+      box.style.top = initialTop + deltaY + 'px';
     }
 
     // Detect which column the element is hovering over
-    currentColumn = detectHoveredColumn(elmnt);
-    const allColumnsExceptCurrent = Array.from(rawColumns).filter(
+    currentColumn = detectHoveredColumn(box);
+    const allColumnsExceptCurrent = columns.filter(
       column => column.id !== currentColumn.id,
     );
     if (currentColumn) {
@@ -320,25 +324,27 @@ function attachDraggingHandlers(elmnt) {
     isDragging = false;
 
     if (currentColumn && hasMoved) {
-      centerDraggedElementInColumn(currentColumn, elmnt);
+      centerDraggedElementInColumn(currentColumn, box);
       currentColumn.style.backgroundColor = COLORS.DEFAULT;
       // Update initialLeft to the new centered position
-      initialLeft = elmnt.offsetLeft;
-      initialTop = elmnt.offsetTop;
+      initialLeft = box.offsetLeft;
+      initialTop = box.offsetTop;
 
       // add event to column
-      oem.addEventToColumn(elmnt, currentColumn);
+      oem.addEventToColumn(box, currentColumn);
     } else {
-      elmnt.style.left = initialLeft + 'px';
-      elmnt.style.top = initialTop + 'px';
+      box.style.left = initialLeft + 'px';
+      box.style.top = initialTop + 'px';
     }
 
     // clean up
     document.onmouseup = null;
     document.onmousemove = null;
+    currentColumn = null;
   }
 }
 
+// helper functions
 function centerDraggedElementInColumn(column, element) {
   const left = column.offsetLeft + 'px';
   element.style.left = left;
