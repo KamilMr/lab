@@ -1,7 +1,7 @@
 // divs-test JavaScript file
 
 // Import the Overlapping Event Manager
-import {oem, COLORS} from './event-manager.js';
+import ColumnObserver, {COLORS} from './event-manager.js';
 
 const allEventsByClass = document.querySelectorAll('.event');
 const rawColumns = document.querySelectorAll('.box');
@@ -9,8 +9,10 @@ const columns = Array.from(rawColumns).filter(column =>
   column.id.startsWith('column'),
 );
 
+const columnObserver = new ColumnObserver();
+
 // register columns in columnObserver
-oem.initializeColumns(columns);
+columnObserver.initializeColumns(columns);
 
 // register listeners
 document.addEventListener('DOMContentLoaded', handleColumnListeners);
@@ -18,7 +20,7 @@ window.addEventListener('resize', handleWindowResize);
 allEventsByClass.forEach(el => attachDraggingHandlers(el));
 
 // Initialize overlapping groups
-oem.refreshLayout();
+columnObserver.refreshLayout();
 
 // handlers of events
 function handleColumnListeners() {
@@ -42,12 +44,12 @@ function handleWindowResize() {
     const currentColumn = detectHoveredColumn(el);
     if (currentColumn) {
       // Reposition and resize the element to fit the column
-      oem._centerDraggedElementInColumn(currentColumn, el);
-      oem._fitElementToColumn(el, currentColumn);
+      columnObserver.centerDraggedElementInColumn(currentColumn, el);
+      columnObserver.fitElementToColumn(el, currentColumn);
     } else {
       // If not in any column, default to first column
-      oem._centerDraggedElementInColumn(rawColumns[0], el);
-      oem._fitElementToColumn(el, rawColumns[0]);
+      columnObserver.centerDraggedElementInColumn(rawColumns[0], el);
+      columnObserver.fitElementToColumn(el, rawColumns[0]);
     }
 
     // Update the drag function's initial positions for this element
@@ -56,7 +58,7 @@ function handleWindowResize() {
   });
 
   // Refresh layout for all columns after resize
-  oem.refreshLayout();
+  columnObserver.refreshLayout();
 }
 
 // attach some handlers to the element
@@ -81,7 +83,7 @@ function attachDraggingHandlers(box) {
   box.onmousedown = dragMouseDown;
 
   const currentHoveredCol = detectHoveredColumn(box);
-  if (currentHoveredCol) oem.addEventToColumn(box, currentHoveredCol);
+  if (currentHoveredCol) columnObserver.addEventToColumn(box, currentHoveredCol.id);
 
   function dragMouseDown(e) {
     e = e || window.event;
@@ -137,11 +139,11 @@ function attachDraggingHandlers(box) {
 
     if (currentColumn && hasMoved) {
       // add event to column
-      const columnCameFrom = oem.getColIdEvIsLoc(box.id);
-      oem.addEventToColumn(box, currentColumn);
+      const columnCameFrom = columnObserver.getColIdEvIsLoc(box.id);
+      columnObserver.addEventToColumn(box, currentColumn.id);
       const toUpdate = [currentColumn.id];
       if (currentColumn.id !== columnCameFrom) toUpdate.push(columnCameFrom);
-      oem.refreshLayout(toUpdate);
+      columnObserver.refreshLayout(toUpdate);
 
       currentColumn.style.backgroundColor = COLORS.DEFAULT;
       // Update initialLeft to the new centered position

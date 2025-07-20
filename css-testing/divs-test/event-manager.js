@@ -9,259 +9,280 @@ const COLORS = {
   DEFAULT: '', // Reset to original
 };
 
-/**
- * Stores event data for each column, including their positions and references.
- *
- * @typedef {Object} OverlappingEvent
- * @property {number} top - The top position of the event (in pixels).
- * @property {number} bottom - The bottom position of the event (in pixels).
- * @property {string} id - The unique identifier for the event.
- * @property {Event} event - The event DOM element.
- */
-
-/**
- * @type {Object.<string, OverlappingEvent[]>}
- * @description
- * An object where each key is a column ID and the value is an array of OverlappingEvent objects.
- */
-const columnObserver = {
-  /**
-   * @type {Object.<string, Object<string, string[]>>}
-   * @private
-   * @description
-   * Internal storage for overlapped event groups by column.
-   */
-  _overlappedEvents: {},
-};
-
-// Create the OEM object
-const oem = {};
-
-oem.addEventToColumn = function (event, column) {
-  const rect = event.getBoundingClientRect();
-  oem.removeEventFromColumns(event);
-  columnObserver[column.id].push({
-    top: rect.top,
-    bottom: rect.bottom,
-    id: event.id,
-    event: event,
-  });
-
-  // Check for overlaps and get wrapper dimensions if needed
-  const overlappingIds = oem.getOverlappingEventsFromColumn(
-    event.id,
-    column.id,
-  );
-  if (overlappingIds) {
-    // Add the current event to the overlapping group
-    const allOverlappingIds = [...overlappingIds, event.id];
-    oem.addToOverlapped(column.id, allOverlappingIds);
+export default class ColumnObserver {
+  constructor() {
+    this.columns = {};
+    this.overlappedEvents = {};
   }
 
-  console.log('When added: ', JSON.stringify(columnObserver, null, 2));
-};
+  addColumn(column) {
+    this.columns[column.id] = [];
+  }
 
-oem.removeEventFromColumns = function (event) {
-  Object.keys(columnObserver)
-    .filter(key => key.startsWith('column'))
-    .forEach(key => {
-      const columnEvents = columnObserver[key];
-      if (columnEvents) {
-        const eventIndex = columnEvents.findIndex(e => e.id === event.id);
-        if (eventIndex !== -1) {
-          // Remove from overlap management before removing from column
-          oem.removeFromOverlapped(event.id);
-          // Remove from column events
-          columnObserver[key] = columnEvents.filter(e => e.id !== event.id);
+  removeColumn(columnId) {
+    delete this.columns[columnId];
+  }
+
+  addEventToColumn(event, columnId) {
+    const rect = event.getBoundingClientRect();
+    this.removeEventFromColumns(event);
+    this.columns[columnId].push({
+      top: rect.top,
+      bottom: rect.bottom,
+      id: event.id,
+      event: event,
+    });
+
+    // check for overlaps and get wrapper dimensions if needed
+    const overlappingIds = this._getOverlappingEventsFromColumn(
+      event.id,
+      columnId,
+    );
+    if (overlappingIds) {
+      // Add the current event to the overlapping group
+      const allOverlappingIds = [...overlappingIds, event.id];
+      this._addToOverlapped(columnId, allOverlappingIds);
+    }
+
+    console.log('When added: ', JSON.stringify(this.columns, null, 2));
+  }
+
+  removeEventFromColumn(eventId, columnId) {//NOTE col not exist in another impl
+    this.columns[columnId] = this.columns[columnId].filter(
+      event => event.id !== eventId,
+    );
+
+    // remove from overlapped events
+    this._removeFromOverlapped(eventId);
+  }
+
+  // Public method to remove event from all columns (like original oem)
+  removeEventFromColumns(event) {
+    Object.keys(this.columns)
+      .filter(key => key.startsWith('column'))
+      .forEach(key => {
+        const columnEvents = this.columns[key];
+        if (columnEvents) {
+          const eventIndex = columnEvents.findIndex(e => e.id === event.id);
+          if (eventIndex !== -1) {
+            // Remove from overlap management before removing from column
+            this.removeFromOverlapped(event.id);
+            // Remove from column events
+            this.columns[key] = columnEvents.filter(e => e.id !== event.id);
+          }
+        }
+      });
+  }
+
+  // Public method for external access (like original oem)
+  getOverlappingEventsFromColumn(eId, columnId) {
+    return this._getOverlappingEventsFromColumn(eId, columnId);
+  }
+
+  // Public method for external access (like original oem)
+  addToOverlapped(cId, eIds) {
+    return this._addToOverlapped(cId, eIds);
+  }
+
+  // Public method for external access (like original oem)
+  removeFromOverlapped(eId) {
+    return this._removeFromOverlapped(eId);
+  }
+
+  // Public method for external access (like original oem)
+  get3CharId() {
+    return this._get3CharId();
+  }
+
+  _removeFromOverlapped(eId) {
+    Object.keys(this.overlappedEvents).forEach(cId => {
+      const columnGroups = this.overlappedEvents[cId];
+      Object.keys(columnGroups).forEach(groupId => {
+        const eventIds = columnGroups[groupId].filter(id => id !== eId);
+
+        if (eventIds.length <= 1)
+          delete this.overlappedEvents[cId][groupId];
+        else this.overlappedEvents[cId][groupId] = eventIds;
+      });
+
+      // if column has no groups remove it
+      if (!Object.keys(columnGroups).length) delete this.overlappedEvents[cId];
+    });
+  }
+
+  getColumnEvents(columnId) {
+    return this.columns[columnId];
+  }
+
+  _getOverlappingEventsFromColumn(eId, columnId) {
+    const columnEvents = this.columns[columnId] || [];
+    const targetEvent = columnEvents.find(e => e.id === eId);
+
+    if (!targetEvent) return undefined;
+
+    // iterate over them and if cross return all event Id it crosses with
+    const overlappingIds = [];
+    columnEvents.forEach(event => {
+      if (event.id !== eId) {
+        // Check if events overlap vertically
+        const overlaps = !(
+          targetEvent.bottom <= event.top || targetEvent.top >= event.bottom
+        );
+        if (overlaps) {
+          overlappingIds.push(event.id);
         }
       }
     });
-};
 
-oem.getAllOverlappedGroups = function () {
-  return Object.values(columnObserver._overlappedEvents)
-    .map(group => Object.values(group))
-    .flat();
-};
-
-oem.get3CharId = function () {
-  // get all ids present inside _overlappedEvents
-  const existingIds = new Set();
-  Object.values(columnObserver._overlappedEvents).forEach(columnGroups => {
-    Object.keys(columnGroups).forEach(groupId => {
-      existingIds.add(groupId);
-    });
-  });
-
-  // create unique id
-  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-  let newId;
-  do {
-    newId = '';
-    for (let i = 0; i < 3; i++) {
-      newId += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-  } while (existingIds.has(newId));
-
-  // return id
-  return newId;
-};
-
-oem._updateWidthOfElements = function (elements, column) {
-  const numberOfElements = elements.length;
-  const columnWidth = column.getBoundingClientRect().width;
-  const columnOffset = column.offsetLeft; // Use offsetLeft instead of getBoundingClientRect().left
-
-  // calculate left offset of elements
-  elements.forEach((id, idx) => {
-    const elementDom = oem.getEventById(id).event;
-    const offset = idx * (columnWidth / numberOfElements) + columnOffset;
-    elementDom.style.width = columnWidth / numberOfElements + 'px';
-    elementDom.style.left = offset + 'px';
-
-    elementDom._dragUpdateInitialPositions();
-  });
-};
-
-oem.addToOverlapped = function (cId, eIds) {
-  // get overlappedEvents
-  if (!columnObserver._overlappedEvents[cId]) {
-    columnObserver._overlappedEvents[cId] = {};
+    // return output is undefined when ok or array of strings
+    return overlappingIds.length > 0 ? overlappingIds : undefined;
   }
 
-  // check if any of those eIds are present there
-  const existingGroups = Object.entries(columnObserver._overlappedEvents[cId]);
-  const groupsToRemove = [];
-
-  existingGroups.forEach(([groupId, groupEventIds]) => {
-    const hasOverlap = eIds.some(eId => groupEventIds.includes(eId));
-    if (hasOverlap) {
-      groupsToRemove.push(groupId);
+  _addToOverlapped(cId, eIds) {
+    if (!this.overlappedEvents[cId]) {
+      this.overlappedEvents[cId] = {};
     }
-  });
 
-  // if there are present remove this whole property that stores them
-  groupsToRemove.forEach(groupId => {
-    delete columnObserver._overlappedEvents[cId][groupId];
-  });
+    // check if any of those eIds are present there
+    const existingGroups = Object.entries(this.overlappedEvents[cId]);
+    const groupsToRemove = [];
 
-  // append new id with new eIds
-  const newGroupId = oem.get3CharId();
-  columnObserver._overlappedEvents[cId][newGroupId] = eIds;
-};
-
-oem.removeFromOverlapped = function (eId) {
-  // else search for path where it is located
-  Object.keys(columnObserver._overlappedEvents).forEach(cId => {
-    const columnGroups = columnObserver._overlappedEvents[cId];
-    Object.keys(columnGroups).forEach(groupId => {
-      // basic check remove all empty groups
-      const eventIds = columnGroups[groupId].filter(id => id !== eId);
-      if (eventIds.length <= 1)
-        delete columnObserver._overlappedEvents[cId][groupId];
-      else columnObserver._overlappedEvents[cId][groupId] = eventIds;
+    existingGroups.forEach(([groupId, groupEventIds]) => {
+      const hasOverlap = eIds.some(eId => groupEventIds.includes(eId));
+      if (hasOverlap) {
+        groupsToRemove.push(groupId);
+      }
     });
 
-    // if column has no groups remove it
-    if (!Object.keys(columnGroups).length)
-      delete columnObserver._overlappedEvents[cId];
-  });
-};
+    // if there are present remove this whole property that stores them
+    groupsToRemove.forEach(groupId => {
+      delete this.overlappedEvents[cId][groupId];
+    });
 
-oem.getOverlappingEventsFromColumn = function (eId, columnId) {
-  // get column id events
-  const columnEvents = columnObserver[columnId] || [];
-  const targetEvent = columnEvents.find(e => e.id === eId);
+    // append new id with new eIds
+    const newGroupId = this._get3CharId();
+    this.overlappedEvents[cId][newGroupId] = eIds;
+  }
 
-  if (!targetEvent) return undefined;
+  _get3CharId() {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    const existingIds = new Set();
+    Object.values(this.overlappedEvents).forEach(columnGroups => {
+      Object.keys(columnGroups).forEach(groupId => {
+        existingIds.add(groupId);
+      });
+    });
 
-  // iterate over them and if cross return all event Id it crosses with
-  const overlappingIds = [];
-  columnEvents.forEach(event => {
-    if (event.id !== eId) {
-      // Check if events overlap vertically
-      const overlaps = !(
-        targetEvent.bottom <= event.top || targetEvent.top >= event.bottom
-      );
-      if (overlaps) {
-        overlappingIds.push(event.id);
+    let newId;
+    do {
+      newId = '';
+      for (let i = 0; i < 3; i++) {
+        newId += chars.charAt(Math.floor(Math.random() * chars.length));
       }
-    }
-  });
+    } while (existingIds.has(newId));
 
-  // return output is undefined when ok or array of strings
-  return overlappingIds.length > 0 ? overlappingIds : undefined;
-};
+    return newId;
+  }
 
-oem.getEventById = function (eventId) {
-  return Object.values(columnObserver)
-    .flat()
-    .find(e => e.id === eventId);
-};
+  getAllOverlappedGroups() {
+    return Object.values(this.overlappedEvents)
+      .map(group => Object.values(group))
+      .flat();
+  }
 
-oem.getColIdEvIsLoc = function (eId) {
-  const columns = Object.keys(columnObserver);
-  const column = columns.find(c =>
-    Object.values(columnObserver[c])
+  getEventById(eventId) {
+    return Object.values(this.columns)
       .flat()
-      .some(ev => ev.id === eId),
-  );
-  return column;
-};
+      .find(e => e.id === eventId);
+  }
 
-// Unified layout refresh function
-oem.refreshLayout = function (
-  columnIds = Object.keys(columnObserver).filter(c => !c.startsWith('_')),
-) {
-  columnIds.forEach(columnId => {
-    const eventsInColumn = columnObserver[columnId];
-    if (!eventsInColumn) return;
+  getColIdEvIsLoc(eId) {
+    const columns = Object.keys(this.columns);
+    const column = columns.find(c =>
+      Object.values(this.columns[c] || [])
+        .flat()
+        .some(ev => ev.id === eId),
+    );
+    return column;
+  }
 
-    // get overlapped events
-    const checkEvents = [];
-    eventsInColumn.forEach(event => {
-      if (checkEvents.flat().includes(event.id)) return;
+  _updateWidthOfElements(elements, column) {
+    const numberOfElements = elements.length;
+    const columnWidth = column.getBoundingClientRect().width;
+    const columnOffset = column.offsetLeft;
 
-      const overlaps = oem.getOverlappingEventsFromColumn(event.id, columnId);
-      if (overlaps) {
-        const overlapss = overlaps.concat(event.id);
-        // sort by left offset
-        const sorted = overlapss.sort(
-          (a, b) =>
-            oem.getEventById(a).event.getBoundingClientRect().left -
-            oem.getEventById(b).event.getBoundingClientRect().left,
-        );
-        checkEvents.push(sorted);
-      } else checkEvents.push([event.id]);
+    // calculate left offset of elements
+    elements.forEach((id, idx) => {
+      const elementDom = this.getEventById(id).event;
+      const offset = idx * (columnWidth / numberOfElements) + columnOffset;
+      elementDom.style.width = columnWidth / numberOfElements + 'px';
+      elementDom.style.left = offset + 'px';
+
+      elementDom._dragUpdateInitialPositions();
     });
+  }
 
-    checkEvents.forEach(gr => {
-      // Find the column element by ID
-      const columnElement = document.querySelector(`#${columnId}`);
-      if (columnElement) {
-        oem._updateWidthOfElements(gr, columnElement);
-      }
+  refreshLayout(columnIds = Object.keys(this.columns).filter(c => !c.startsWith('_'))) {
+    columnIds.forEach(columnId => {
+      const eventsInColumn = this.columns[columnId];
+      if (!eventsInColumn) return;
+
+      // get overlapped events
+      const checkEvents = [];
+      eventsInColumn.forEach(event => {
+        if (checkEvents.flat().includes(event.id)) return;
+
+        const overlaps = this._getOverlappingEventsFromColumn(event.id, columnId);
+        if (overlaps) {
+          const overlapss = overlaps.concat(event.id);
+          // sort by left offset
+          const sorted = overlapss.sort(
+            (a, b) =>
+              this.getEventById(a).event.getBoundingClientRect().left -
+              this.getEventById(b).event.getBoundingClientRect().left,
+          );
+          checkEvents.push(sorted);
+        } else checkEvents.push([event.id]);
+      });
+
+      checkEvents.forEach(gr => {
+        // Find the column element by ID
+        const columnElement = document.querySelector(`#${columnId}`);
+        if (columnElement) {
+          this._updateWidthOfElements(gr, columnElement);
+        }
+      });
     });
-  });
-};
+  }
 
-// helper functions
-oem._centerDraggedElementInColumn = function (column, element) {
-  const left = column.offsetLeft + 'px';
-  element.style.left = left;
-};
+  _centerDraggedElementInColumn(column, element) {
+    const left = column.offsetLeft + 'px';
+    element.style.left = left;
+  }
 
-// fit elements to column
-oem._fitElementToColumn = function (element, column) {
-  const columnWidth = column.getBoundingClientRect().width;
-  element.style.width = columnWidth + 'px';
-};
+  _fitElementToColumn(element, column) {
+    const columnWidth = column.getBoundingClientRect().width;
+    element.style.width = columnWidth + 'px';
+  }
 
-// Initialize columns in columnObserver
-oem.initializeColumns = function (columns) {
-  columns.forEach(column => (columnObserver[column.id] = []));
-  console.log(JSON.stringify(columnObserver, null, 2));
-};
+  initializeColumns(columns) {
+    columns.forEach(column => (this.columns[column.id] = []));
+    console.log(JSON.stringify(this.columns, null, 2));
+  }
 
-// Export the OEM module
-export {oem, COLORS};
+  // Public method for external access (like original oem)
+  centerDraggedElementInColumn(column, element) {
+    return this._centerDraggedElementInColumn(column, element);
+  }
+
+  // Public method for external access (like original oem)
+  fitElementToColumn(element, column) {
+    return this._fitElementToColumn(element, column);
+  }
+
+  // Public method for external access (like original oem)
+  updateWidthOfElements(elements, column) {
+    return this._updateWidthOfElements(elements, column);
+  }
+}
+export {COLORS};
