@@ -3,7 +3,6 @@
 // Color constants
 const COLORS = {
   HOVER_BLUE: '#3498db',
-  WHITE: 'white',
   DEFAULT: '', // Reset to original
 };
 
@@ -69,10 +68,7 @@ oem.addEventToColumn = function (event, column) {
     oem.addToOverlapped(column.id, allOverlappingIds);
   }
 
-  console.log(
-    'When added: ',
-    JSON.stringify(columnObserver, null, 2),
-  );
+  console.log('When added: ', JSON.stringify(columnObserver, null, 2));
 };
 
 oem.removeEventFromColumns = function (event) {
@@ -92,8 +88,10 @@ oem.removeEventFromColumns = function (event) {
     });
 };
 
-oem.getOverlappedFromColumn = function (cId) {
-  return columnObserver[cId];
+oem.getAllOverlappedGroups = function () {
+  return Object.values(columnObserver._overlappedEvents)
+    .map(group => Object.values(group))
+    .flat();
 };
 
 oem.get3CharId = function () {
@@ -151,14 +149,16 @@ oem.removeFromOverlapped = function (eId) {
   Object.keys(columnObserver._overlappedEvents).forEach(cId => {
     const columnGroups = columnObserver._overlappedEvents[cId];
     Object.keys(columnGroups).forEach(groupId => {
-        // basic check remove all empty groups
+      // basic check remove all empty groups
       const eventIds = columnGroups[groupId].filter(id => id !== eId);
-      if (eventIds.length <= 1) delete columnObserver._overlappedEvents[cId][groupId];
+      if (eventIds.length <= 1)
+        delete columnObserver._overlappedEvents[cId][groupId];
       else columnObserver._overlappedEvents[cId][groupId] = eventIds;
     });
 
     // if column has no groups remove it
-    if (!Object.keys(columnGroups).length) delete columnObserver._overlappedEvents[cId];
+    if (!Object.keys(columnGroups).length)
+      delete columnObserver._overlappedEvents[cId];
   });
 };
 
@@ -187,6 +187,22 @@ oem.getOverlappingEventsFromColumn = function (eId, columnId) {
   return overlappingIds.length > 0 ? overlappingIds : undefined;
 };
 
+oem.getEventById = function (eventId) {
+  return Object.values(columnObserver)
+    .flat()
+    .find(e => e.id === eventId);
+};
+
+oem.getColIdEvIsLoc = function (eId) {
+  const columns = Object.keys(columnObserver);
+  const column = columns.find(c =>
+    Object.values(columnObserver[c])
+      .flat()
+      .some(ev => ev.id === eId),
+  );
+  return column;
+};
+
 const allEventsByClass = document.querySelectorAll('.event');
 
 const rawColumns = document.querySelectorAll('.box');
@@ -194,27 +210,25 @@ const columns = Array.from(rawColumns).filter(column =>
   column.id.startsWith('column'),
 );
 
-const rawContainer = document.querySelector('.container');
-const rootContainer = Array.from(rawContainer)[0];
-
 // register columns in columnObserver
 columns.forEach(column => (columnObserver[column.id] = []));
 console.log(JSON.stringify(columnObserver, null, 2));
 
-// register listeners 
+// register listeners
 document.addEventListener('DOMContentLoaded', handleColumnListeners);
 window.addEventListener('resize', handleWindowResize);
 allEventsByClass.forEach(el => attachDraggingHandlers(el));
 
-allEventsByClass.forEach(el => fitElementToColumn(el, rawColumns[0]));
+// Initialize overlapping groups
+const groups = oem.getAllOverlappedGroups();
+groups.forEach(el => updateWidthOfElements(el, columns[0]));
 
 // handlers of events
 function handleColumnListeners() {
   rawColumns.forEach(column => {
     column.addEventListener('mouseenter', function () {
       this.style.backgroundColor = COLORS.HOVER_BLUE;
-      this.style.color = COLORS.WHITE;
-      // console.log('whatColumnIsOn', this.id);
+      this.style.color = COLORS.DEFAULT;
     });
 
     // Mouse leave - restore original background color
@@ -266,7 +280,6 @@ function attachDraggingHandlers(box) {
 
   box.onmousedown = dragMouseDown;
 
-  // detect event currently in column
   const currentHoveredCol = detectHoveredColumn(box);
   if (currentHoveredCol) oem.addEventToColumn(box, currentHoveredCol);
 
@@ -297,7 +310,6 @@ function attachDraggingHandlers(box) {
     // Check if mouse has moved enough to be considered a drag
     const totalMovement = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
     if (totalMovement > DRAG_THRESHOLD) hasMoved = true;
-    
 
     // Only update position if we've actually moved
     if (hasMoved) {
@@ -324,14 +336,17 @@ function attachDraggingHandlers(box) {
     isDragging = false;
 
     if (currentColumn && hasMoved) {
-      centerDraggedElementInColumn(currentColumn, box);
+      // add event to column
+      const columnCameFrom = oem.getColIdEvIsLoc(box.id);
+      oem.addEventToColumn(box, currentColumn);
+      const toUpdate = [currentColumn.id];
+      if (currentColumn.id !== columnCameFrom) toUpdate.push(columnCameFrom);
+      getOverlapsAndUpdateWidth(toUpdate);
+
       currentColumn.style.backgroundColor = COLORS.DEFAULT;
       // Update initialLeft to the new centered position
       initialLeft = box.offsetLeft;
       initialTop = box.offsetTop;
-
-      // add event to column
-      oem.addEventToColumn(box, currentColumn);
     } else {
       box.style.left = initialLeft + 'px';
       box.style.top = initialTop + 'px';
@@ -375,11 +390,58 @@ function detectHoveredColumn(elmnt) {
       }
     }
   }
-  return 0;
+  return null;
 }
 
 // fit elements to column
 function fitElementToColumn(element, column) {
   const columnWidth = column.getBoundingClientRect().width;
   element.style.width = columnWidth + 'px';
+}
+
+function getOverlapsAndUpdateWidth(arrayOfCols) {
+  arrayOfCols.forEach(columnId => {
+    const eventsInColumn = columnObserver[columnId];
+    // get left offset of column
+    // get overlapped events
+    const checkEvents = [];
+    eventsInColumn.forEach(event => {
+      if (checkEvents.flat().includes(event.id)) return;
+
+      const overlaps = oem.getOverlappingEventsFromColumn(event.id, columnId);
+      if (overlaps) {
+        const overlapss = overlaps.concat(event.id);
+        // sort by left offset
+        const sorted = overlapss.sort(
+          (a, b) =>
+            oem.getEventById(a).event.getBoundingClientRect().left -
+            oem.getEventById(b).event.getBoundingClientRect().left,
+        );
+        checkEvents.push(sorted);
+      } else checkEvents.push([event.id]);
+    });
+
+    checkEvents.forEach(gr =>
+      updateWidthOfElements(
+        gr,
+        columns.find(col => col.id === columnId),
+      ),
+    );
+  });
+}
+
+function updateWidthOfElements(elements, column) {
+  const numberOfElements = elements.length;
+  const columnWidth = column.getBoundingClientRect().width;
+  const columnOffset = column.offsetLeft; // Use offsetLeft instead of getBoundingClientRect().left
+
+  // calculate left offset of elements
+  elements.forEach((id, idx) => {
+    const elementDom = oem.getEventById(id).event;
+    const offset = idx * (columnWidth / numberOfElements) + columnOffset;
+    elementDom.style.width = columnWidth / numberOfElements + 'px';
+    elementDom.style.left = offset + 'px';
+
+    elementDom._dragUpdateInitialPositions();
+  });
 }
