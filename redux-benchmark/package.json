@@ -1,0 +1,18 @@
+{
+  "name": "redux-benchmark",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "scenario:factory": "node scenarios/01-factory-antipattern.js",
+    "scenario:shared": "node scenarios/02-shared-memo.js",
+    "scenario:reference": "node scenarios/03-reference-identity.js",
+    "scenario:parameterized": "node scenarios/04-parameterized.js",
+    "scenario:expensive": "node scenarios/05-expensive-compute.js"
+  },
+  "dependencies": {
+    "@reduxjs/toolkit": "^2.2.7",
+    "reselect": "^5.1.1"
+  }
+}
