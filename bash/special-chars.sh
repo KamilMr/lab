@@ -17,3 +17,8 @@ echo $(( 2#101011 ))  # Base conversion, not a comment.
 # quotes
 # `"` preserves most of special characters withing string
 # `'` preserves all of special characters withing string
+
+# Commas links together a series of arithmetic operations, evaluates them but only one returned
+let "t2 = ((a = 9, 15/3))"
+echo $t2
+echo $a
