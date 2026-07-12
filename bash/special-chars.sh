@@ -22,3 +22,15 @@ echo $(( 2#101011 ))  # Base conversion, not a comment.
 let "t2 = ((a = 9, 15/3))"
 echo $t2
 echo $a
+
+# It can concatenate strings:
+for file in /{,usr/}bin/*calc
+do if [ -x "$file" ]
+then
+  echo $file
+else echo "File $file is not present"
+  fi
+done
+
+# escape `\`
+# when using `\x` we escape x so it can be expressed literally.
