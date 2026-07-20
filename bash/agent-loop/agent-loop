@@ -1,0 +1,464 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Basic reusable Pi agent loop.
+# Run it from a project root that has a markdown todo file and is a git repo.
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+if [[ -n "${AGENT_LOOP_PROJECT_DIR:-}" ]]; then
+  cd "$AGENT_LOOP_PROJECT_DIR"
+fi
+
+if ! command -v pi >/dev/null 2>&1; then
+  echo "pi command not found" >&2
+  exit 1
+fi
+
+if ! command -v git >/dev/null 2>&1; then
+  echo "git command not found" >&2
+  exit 1
+fi
+
+if ! command -v node >/dev/null 2>&1; then
+  echo "node command not found" >&2
+  exit 1
+fi
+
+PROJECT_NAME="${AGENT_LOOP_PROJECT_NAME:-$(basename "$PWD")}"
+TODO_FILE="${AGENT_LOOP_TODO_FILE:-todo.md}"
+RUNS_FILE="${AGENT_LOOP_RUNS_FILE:-workflow-runs.md}"
+PROMPT_DIR="${AGENT_LOOP_PROMPT_DIR:-${SCRIPT_DIR}/prompts}"
+TASK_ID_REGEX="${AGENT_LOOP_TASK_ID_REGEX:-[A-Z]+-[0-9]+[a-z]?}"
+REQUIRED_READING="${AGENT_LOOP_REQUIRED_READING:-AGENTS.md ${TODO_FILE}}"
+BOUNDARIES="${AGENT_LOOP_BOUNDARIES:-Work only inside this repository unless the task explicitly says otherwise.}"
+REFERENCE_NOTE="${AGENT_LOOP_REFERENCE_NOTE:-Use project reference files only when the task or project instructions allow it.}"
+BUILD_COMMAND="${AGENT_LOOP_BUILD_COMMAND:-npm run build}"
+TEST_COMMAND="${AGENT_LOOP_TEST_COMMAND:-npm run test}"
+BROWSER_COMMAND="${AGENT_LOOP_BROWSER_COMMAND:-npm run test:browser}"
+SCREENSHOT_ROUTE="${AGENT_LOOP_SCREENSHOT_ROUTE:-/dev/showreal}"
+SCREENSHOT_DIR="${AGENT_LOOP_SCREENSHOT_DIR:-artifacts/screenshots}"
+WORKFLOW_TZ="${AGENT_LOOP_TZ:-${PI_WORKFLOW_TZ:-Europe/Warsaw}}"
+
+PLANNER_MODEL="${AGENT_LOOP_PLANNER_MODEL:-${PI_PLANNER_MODEL:-}}"
+IMPLEMENTER_MODEL="${AGENT_LOOP_IMPLEMENTER_MODEL:-${PI_IMPLEMENTER_MODEL:-}}"
+REVIEWER_MODEL="${AGENT_LOOP_REVIEWER_MODEL:-${PI_REVIEWER_MODEL:-}}"
+VISUAL_MODEL="${AGENT_LOOP_VISUAL_MODEL:-${PI_VISUAL_MODEL:-}}"
+PLANNER_THINKING="${AGENT_LOOP_PLANNER_THINKING:-${PI_PLANNER_THINKING:-high}}"
+IMPLEMENTER_THINKING="${AGENT_LOOP_IMPLEMENTER_THINKING:-${PI_IMPLEMENTER_THINKING:-medium}}"
+REVIEWER_THINKING="${AGENT_LOOP_REVIEWER_THINKING:-${PI_REVIEWER_THINKING:-high}}"
+VISUAL_THINKING="${AGENT_LOOP_VISUAL_THINKING:-${PI_VISUAL_THINKING:-medium}}"
+
+PLANNER_NAME="${AGENT_LOOP_PLANNER_NAME:-${PROJECT_NAME} planner}"
+IMPLEMENTER_NAME="${AGENT_LOOP_IMPLEMENTER_NAME:-${PROJECT_NAME} implementer}"
+REVIEWER_NAME="${AGENT_LOOP_REVIEWER_NAME:-${PROJECT_NAME} reviewer}"
+VISUAL_NAME="${AGENT_LOOP_VISUAL_NAME:-${PROJECT_NAME} visual check}"
+
+ensure_task_file() {
+  if [[ ! -f "$TODO_FILE" ]]; then
+    echo "task file not found: $TODO_FILE" >&2
+    exit 1
+  fi
+}
+
+ensure_workflow_runs_file() {
+  local dir
+  dir="$(dirname "$RUNS_FILE")"
+  if [[ "$dir" != "." ]]; then
+    mkdir -p "$dir"
+  fi
+
+  if [[ ! -f "$RUNS_FILE" ]]; then
+    cat > "$RUNS_FILE" <<'EOF_RUNS'
+# Workflow Runs
+
+| Time | Step | Task | Tokens | Duration | Result | Commit |
+|---|---|---|---:|---:|---|---|
+EOF_RUNS
+  fi
+}
+
+format_duration() {
+  local seconds="$1"
+
+  if ((seconds < 60)); then
+    echo "${seconds}s"
+  else
+    echo "$(((seconds + 30) / 60))m"
+  fi
+}
+
+extract_tokens() {
+  local json_file="$1"
+
+  node - "$json_file" <<'NODE'
+const fs = require('fs');
+const file = process.argv[2];
+let total = 0;
+
+for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
+  if (!line.trim()) continue;
+  let event;
+  try {
+    event = JSON.parse(line);
+  } catch {
+    continue;
+  }
+
+  if (event.type !== 'message_end') continue;
+  const message = event.message;
+  if (!message || message.role !== 'assistant') continue;
+
+  const usage = message.usage || event.usage;
+  if (!usage) continue;
+
+  total += Number(
+    usage.totalTokens ??
+      usage.total ??
+      (Number(usage.input || 0) +
+        Number(usage.output || 0) +
+        Number(usage.cacheRead || 0) +
+        Number(usage.cacheWrite || 0)),
+  );
+}
+
+console.log(`${(total / 1_000_000).toFixed(2)}M`);
+NODE
+}
+
+print_assistant_output() {
+  local json_file="$1"
+
+  node - "$json_file" <<'NODE'
+const fs = require('fs');
+const file = process.argv[2];
+const messages = [];
+
+for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
+  if (!line.trim()) continue;
+  let event;
+  try {
+    event = JSON.parse(line);
+  } catch {
+    continue;
+  }
+
+  if (event.type !== 'message_end') continue;
+  const message = event.message;
+  if (!message || message.role !== 'assistant') continue;
+
+  let text = '';
+  if (typeof message.content === 'string') {
+    text = message.content;
+  } else if (Array.isArray(message.content)) {
+    text = message.content
+      .filter(part => part && part.type === 'text' && typeof part.text === 'string')
+      .map(part => part.text)
+      .join('');
+  }
+
+  text = text.trim();
+  if (text) messages.push(text);
+}
+
+if (messages.length > 0) {
+  console.log(messages[messages.length - 1]);
+}
+NODE
+}
+
+extract_task_from_commit() {
+  local commit="$1"
+
+  if [[ -z "$commit" ]]; then
+    echo "-"
+    return
+  fi
+
+  git log -1 --format=%s "$commit" | grep -Eo "$TASK_ID_REGEX" | head -1 || echo "-"
+}
+
+status_for_task() {
+  local task="$1"
+
+  if [[ "$task" == "-" ]]; then
+    echo "-"
+    return
+  fi
+
+  node - "$task" "$TODO_FILE" <<'NODE'
+const fs = require('fs');
+const task = process.argv[2];
+const file = process.argv[3];
+const todo = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
+const escaped = task.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const match = todo.match(new RegExp(`^\\s*- \\[([^\\]]+)\\]\\s+${escaped}\\b`, 'm'));
+console.log(match ? match[1] : '-');
+NODE
+}
+
+append_workflow_run() {
+  local step="$1"
+  local task="$2"
+  local tokens="$3"
+  local duration="$4"
+  local result="$5"
+  local commit="$6"
+  local timestamp
+
+  timestamp="$(TZ="$WORKFLOW_TZ" date '+%Y-%m-%d %H:%M:%S %Z')"
+  ensure_workflow_runs_file
+  printf '| %s | %s | %s | %s | %s | %s | %s |\n' \
+    "$timestamp" "$step" "$task" "$tokens" "$duration" "$result" "$commit" \
+    >> "$RUNS_FILE"
+}
+
+commit_workflow_run() {
+  local step="$1"
+  local task="$2"
+
+  git add "$RUNS_FILE"
+  if git diff --cached --quiet -- "$RUNS_FILE"; then
+    return
+  fi
+
+  git commit -m "chore(metrics): record ${task} ${step} run" -- "$RUNS_FILE"
+}
+
+required_reading_list() {
+  local item
+  for item in $REQUIRED_READING; do
+    printf -- '- %s\n' "$item"
+  done
+}
+
+check_commands_list() {
+  if [[ -n "$BUILD_COMMAND" ]]; then
+    printf -- '- Build: %s\n' "$BUILD_COMMAND"
+  fi
+  if [[ -n "$TEST_COMMAND" ]]; then
+    printf -- '- Tests: %s\n' "$TEST_COMMAND"
+  else
+    printf -- '- Tests: any available project test command\n'
+  fi
+}
+
+render_prompt_file() {
+  local file="$1"
+  local content required_reading check_commands browser_command
+
+  if [[ ! -f "$file" ]]; then
+    echo "prompt file not found: $file" >&2
+    exit 1
+  fi
+
+  content="$(<"$file")"
+  required_reading="$(required_reading_list)"
+  check_commands="$(check_commands_list)"
+  browser_command="${BROWSER_COMMAND:-look for a project browser/e2e command}"
+
+  content="${content//\{\{PROJECT_NAME\}\}/$PROJECT_NAME}"
+  content="${content//\{\{TODO_FILE\}\}/$TODO_FILE}"
+  content="${content//\{\{RUNS_FILE\}\}/$RUNS_FILE}"
+  content="${content//\{\{TASK_ID_REGEX\}\}/$TASK_ID_REGEX}"
+  content="${content//\{\{REQUIRED_READING\}\}/$required_reading}"
+  content="${content//\{\{BOUNDARIES\}\}/$BOUNDARIES}"
+  content="${content//\{\{REFERENCE_NOTE\}\}/$REFERENCE_NOTE}"
+  content="${content//\{\{BUILD_COMMAND\}\}/$BUILD_COMMAND}"
+  content="${content//\{\{TEST_COMMAND\}\}/$TEST_COMMAND}"
+  content="${content//\{\{CHECK_COMMANDS\}\}/$check_commands}"
+  content="${content//\{\{BROWSER_COMMAND\}\}/$browser_command}"
+  content="${content//\{\{SCREENSHOT_ROUTE\}\}/$SCREENSHOT_ROUTE}"
+  content="${content//\{\{SCREENSHOT_DIR\}\}/$SCREENSHOT_DIR}"
+
+  printf '%s\n' "$content"
+}
+
+load_prompt() {
+  local role="$1"
+
+  render_prompt_file "$PROMPT_DIR/common.md"
+  printf '\n'
+  render_prompt_file "$PROMPT_DIR/${role}.md"
+}
+
+run_pi() {
+  local step="$1"
+  local model="$2"
+  local thinking="$3"
+  local name="$4"
+  local prompt="$5"
+  local args=(--no-session --approve --name "$name")
+  local before_commit after_commit agent_commit agent_commit_short task result
+  local started_at ended_at duration_seconds duration tokens json_output exit_code
+
+  ensure_task_file
+
+  if [[ -n "$model" ]]; then
+    args+=(--model "$model")
+  else
+    args+=(--thinking "$thinking")
+  fi
+
+  before_commit="$(git rev-parse HEAD 2>/dev/null || true)"
+  started_at="$(date +%s)"
+  json_output="$(mktemp)"
+
+  set +e
+  pi "${args[@]}" --mode json "$prompt" > "$json_output"
+  exit_code=$?
+  set -e
+
+  ended_at="$(date +%s)"
+  duration_seconds=$((ended_at - started_at))
+  duration="$(format_duration "$duration_seconds")"
+  tokens="$(extract_tokens "$json_output")"
+
+  print_assistant_output "$json_output"
+  rm -f "$json_output"
+
+  after_commit="$(git rev-parse HEAD 2>/dev/null || true)"
+  agent_commit=""
+  agent_commit_short="-"
+
+  if [[ -n "$after_commit" && "$after_commit" != "$before_commit" ]]; then
+    agent_commit="$after_commit"
+    agent_commit_short="$(git rev-parse --short "$agent_commit")"
+  fi
+
+  task="$(extract_task_from_commit "$agent_commit")"
+  if [[ "$exit_code" -ne 0 ]]; then
+    result="failed"
+  else
+    result="$(status_for_task "$task")"
+  fi
+
+  append_workflow_run "$step" "$task" "$tokens" "$duration" "$result" "$agent_commit_short"
+  commit_workflow_run "$step" "$task"
+
+  return "$exit_code"
+}
+
+plan() {
+  run_pi "plan" "$PLANNER_MODEL" "$PLANNER_THINKING" "$PLANNER_NAME" "$(load_prompt planner)"
+}
+
+implement() {
+  run_pi "implement" "$IMPLEMENTER_MODEL" "$IMPLEMENTER_THINKING" "$IMPLEMENTER_NAME" "$(load_prompt implementer)"
+}
+
+visual() {
+  run_pi "visual" "$VISUAL_MODEL" "$VISUAL_THINKING" "$VISUAL_NAME" "$(load_prompt visual)"
+}
+
+review() {
+  run_pi "review" "$REVIEWER_MODEL" "$REVIEWER_THINKING" "$REVIEWER_NAME" "$(load_prompt reviewer)"
+}
+
+validate_count() {
+  local count="$1"
+
+  if ! [[ "$count" =~ ^[1-9][0-9]*$ ]]; then
+    echo "cycle count must be a positive integer" >&2
+    exit 1
+  fi
+}
+
+cycle() {
+  local count="${1:-1}"
+  validate_count "$count"
+
+  for ((i = 1; i <= count; i++)); do
+    echo "=== Agent loop cycle $i/$count: plan ==="
+    plan
+    echo "=== Agent loop cycle $i/$count: implement ==="
+    implement
+    echo "=== Agent loop cycle $i/$count: review ==="
+    review
+  done
+}
+
+cycle_visual() {
+  local count="${1:-1}"
+  validate_count "$count"
+
+  for ((i = 1; i <= count; i++)); do
+    echo "=== Agent loop visual cycle $i/$count: plan ==="
+    plan
+    echo "=== Agent loop visual cycle $i/$count: implement ==="
+    implement
+    echo "=== Agent loop visual cycle $i/$count: visual ==="
+    visual
+    echo "=== Agent loop visual cycle $i/$count: review ==="
+    review
+  done
+}
+
+usage() {
+  cat <<'USAGE'
+Usage: agent-loop <plan|implement|visual|review|cycle|cycle-visual> [count]
+
+Subcommands:
+  plan                 planner marks one pending task ready
+  implement            implementer completes one ready task
+  visual               visual/browser check agent
+  review               reviewer accepts or creates fix tasks
+  cycle [count]        run plan, implement, review count times; default: 1
+  cycle-visual [count] run plan, implement, visual, review count times; default: 1
+
+Run from the project root. The project must be a git repo and have a markdown todo file.
+
+Common environment configuration:
+  AGENT_LOOP_PROJECT_DIR=/path/to/project
+  AGENT_LOOP_PROJECT_NAME=my-project
+  AGENT_LOOP_TODO_FILE=todo.md
+  AGENT_LOOP_RUNS_FILE=workflow-runs.md
+  AGENT_LOOP_PROMPT_DIR=/path/to/prompts
+  AGENT_LOOP_TASK_ID_REGEX='[A-Z]+-[0-9]+[a-z]?'
+  AGENT_LOOP_REQUIRED_READING='AGENTS.md todo.md'
+  AGENT_LOOP_BOUNDARIES='Work only inside this repository.'
+  AGENT_LOOP_BUILD_COMMAND='npm run build'
+  AGENT_LOOP_TEST_COMMAND='npm run test'
+  AGENT_LOOP_BROWSER_COMMAND='npm run test:browser'
+  AGENT_LOOP_SCREENSHOT_ROUTE='/dev/showreal'
+  AGENT_LOOP_SCREENSHOT_DIR='artifacts/screenshots'
+  AGENT_LOOP_TZ=Europe/Warsaw
+
+Thinking/model overrides:
+  AGENT_LOOP_PLANNER_THINKING=high
+  AGENT_LOOP_IMPLEMENTER_THINKING=medium
+  AGENT_LOOP_REVIEWER_THINKING=high
+  AGENT_LOOP_VISUAL_THINKING=medium
+  AGENT_LOOP_PLANNER_MODEL=provider/model-id
+  AGENT_LOOP_IMPLEMENTER_MODEL=provider/model-id
+  AGENT_LOOP_REVIEWER_MODEL=provider/model-id
+  AGENT_LOOP_VISUAL_MODEL=provider/model-id
+
+The old PI_* model/thinking environment names are also supported as fallbacks.
+USAGE
+}
+
+case "${1:-}" in
+  plan)
+    plan
+    ;;
+  implement)
+    implement
+    ;;
+  visual)
+    visual
+    ;;
+  review)
+    review
+    ;;
+  cycle)
+    cycle "${2:-1}"
+    ;;
+  cycle-visual)
+    cycle_visual "${2:-1}"
+    ;;
+  *)
+    usage
+    exit 1
+    ;;
+esac
