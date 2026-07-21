@@ -1,0 +1,10 @@
+{
+  "tasks": [
+    {
+      "id": "AL001",
+      "status": "ready",
+      "rank": 1,
+      "dependencies": []
+    }
+  ]
+}
