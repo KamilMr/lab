@@ -14,14 +14,14 @@ Use this plan to replace direct Markdown task handling with a Bash + `jq` task b
 
 ## Tasks
 
-- [pending-review] AL-001 Implement the read-only `task_current` function in `agent-loop/lib/task_db.sh`.
+- [done] AL-001 Implement the read-only `task_current` function in `agent-loop/lib/task_db.sh`.
   - Read `.agent-loop/tasks.json` by default and allow an explicit file argument.
   - Add a minimal JSON fixture under `agent-loop/tests/fixtures/`.
   - Return the single task whose status is `ready`, `working`, `pending-review`, or `review`.
   - Return a clear non-zero result when the file is missing, no active task exists, or multiple active tasks exist.
   - Do not modify the JSON file.
 
-- [pending] AL-002 Add read-only task-file validation.
+- [ready] AL-002 Add read-only task-file validation.
   - Validate the top-level JSON shape and required task fields.
   - Check that IDs are unique and contain only uppercase letters and numbers.
   - Check allowed statuses, numeric ranks, dependency references, and the one-active-task invariant.
