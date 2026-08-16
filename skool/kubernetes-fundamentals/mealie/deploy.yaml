@@ -17,8 +17,8 @@ spec:
         app: mealie
     spec:
       containers:
-      - image: ghcr.io/mealie-recipes/mealie:v1.8.0
-        name: mealie 
+      - image: ghcr.io/mealie-recipes/mealie:v3.22.0 # this will grab from git
+        name: mealie
         ports: # without this container will not be exposed
           - containerPort: 9000 # expose pod to pod
         volumeMounts:
