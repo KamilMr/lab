@@ -5,8 +5,23 @@ metadata:
     run: nginx-yaml
     method: fromcode
     another: label
-  name: nginx-yaml
+  name: nginx-storage
 spec:
   containers:
   - image: nginx
-    name: nginx-yaml
+    name: nginx
+    volumeMounts:
+      - mountPath: /scratch
+        name: scratch-volume
+  - image: busybox
+    name: busybox
+    command: ["/bin/sh", "-c"]
+    args: ["sleep 1000"]
+    volumeMounts:
+      - mountPath: /scratch
+        name: scratch-volume
+
+  volumes:
+    - name: scratch-volume
+      emptyDir:
+        sizeLimit: 500Mi

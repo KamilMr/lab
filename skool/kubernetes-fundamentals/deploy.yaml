@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: my-httpd
+  name: my-httpd
+spec:
+  replicas: 10
+  selector:
+    matchLabels:
+      app: my-httpd
+  template:
+    metadata:
+      labels:
+        app: my-httpd
+    spec:
+      containers:
+        - image: httpd:alpine3.18
+          name: httpd
+          command: ["/bin/bash", "-c"]
+          args: ["sleep 5; exit 1"]
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1

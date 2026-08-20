@@ -20,11 +20,11 @@ spec:
       - image: ghcr.io/mealie-recipes/mealie:v3.22.0 # this will grab from git
         name: mealie
         ports: # without this container will not be exposed
-          - containerPort: 9000 # expose pod to pod
-        volumeMounts:
+          - containerPort: 9000 # expose port to pod
+        volumeMounts: # mounts to container.
         - mountPath: /app/data
-          name: mealie-data
-      volumes: # level of pod
-        - name: mealie-data 
+          name: mealie-data # this volume name I want to mount to mountPath
+      volumes: # level of pod, we need it to mount
+        - name: mealie-data # can have any name
           persistentVolumeClaim:
-            claimName: mealie-data
+            claimName: mealie-data # this has to point
