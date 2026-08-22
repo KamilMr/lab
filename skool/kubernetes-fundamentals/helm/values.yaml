@@ -1,5 +1,3 @@
 replicaCount: 2
-image:
-  tag: "123"
 podLabels:
   hello: world
