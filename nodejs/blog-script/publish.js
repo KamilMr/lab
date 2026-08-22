@@ -1,4 +1,5 @@
 const fs = require("node:fs");
+const crypto = require("node:crypto");
 const os = require("node:os");
 const path = require("node:path");
 const { execFileSync, spawnSync } = require("node:child_process");
@@ -35,34 +36,97 @@ const replaceAsync = async (value, pattern, replacer) => {
   return result + value.slice(lastIndex);
 };
 
-async function doReplace(full, inner) {
-  const imagePath = path.join(this.source, IMAGE_ATTACHMENT_PATH, inner);
-  const absoluteImagePath = resolveRelative(imagePath);
-  if (!fs.existsSync(absoluteImagePath)) return full;
+const RASTER_FORMATS = new Set(["avif", "gif", "heif", "jpeg", "jxl", "png", "tiff", "webp"]);
+const HASHED_WEBP = /^[a-f0-9]{12}\.webp$/;
 
-  const { ext, name } = path.parse(inner);
-  const safe = name.toLowerCase().replace(/[\s.]/g, "-");
-  const isPng = ext.toLowerCase() === ".png";
-  const newName = safe + (isPng ? ".webp" : ext);
-  const outputPath = path.join(this.imageDirectory, newName);
+const parseEmbed = (inner) => {
+  const separator = inner.indexOf("|");
+  if (separator === -1) return { attachment: inner, alias: "" };
 
-  if (isPng) {
-    await sharp(absoluteImagePath).webp({ quality: 82 }).toFile(outputPath);
-  } else {
-    fs.copyFileSync(absoluteImagePath, outputPath);
+  return {
+    attachment: inner.slice(0, separator),
+    alias: inner.slice(separator + 1),
+  };
+};
+
+const defaultAlt = (attachment) =>
+  path.parse(attachment).name.toLowerCase().replace(/[\s.]/g, "-");
+
+const getRasterFormat = async (imagePath) => {
+  try {
+    const { format } = await sharp(imagePath).metadata();
+    return RASTER_FORMATS.has(format) ? format : null;
+  } catch {
+    return null;
+  }
+};
+
+const processAttachment = async (source, imageDirectory, attachment, images) => {
+  if (images.has(attachment)) return images.get(attachment);
+
+  const sourcePath = path.join(source, IMAGE_ATTACHMENT_PATH, attachment);
+  if (!fs.existsSync(sourcePath)) return null;
+
+  const format = await getRasterFormat(sourcePath);
+  if (!format) return null;
+
+  const newName = HASHED_WEBP.test(attachment)
+    ? attachment
+    : `${crypto.createHash("sha256").update(attachment).digest("hex").slice(0, 12)}.webp`;
+  const newPath = path.join(source, IMAGE_ATTACHMENT_PATH, newName);
+
+  if (newPath !== sourcePath) {
+    const existingFormat = fs.existsSync(newPath) ? await getRasterFormat(newPath) : null;
+    if (existingFormat === "webp") {
+      fs.rmSync(sourcePath);
+    } else {
+      if (fs.existsSync(newPath)) fs.rmSync(newPath);
+      if (format === "webp") {
+        fs.renameSync(sourcePath, newPath);
+      } else {
+        await sharp(sourcePath).webp({ quality: 82 }).toFile(newPath);
+        if (!fs.existsSync(newPath)) throw new Error(`Could not create ${newPath}`);
+        fs.rmSync(sourcePath);
+      }
+    }
   }
 
-  return `![${safe}](/images/${newName})`;
+  const outputPath = path.join(imageDirectory, newName);
+  fs.copyFileSync(newPath, outputPath);
+
+  const image = { newName };
+  images.set(attachment, image);
+  images.set(newName, image);
+  return image;
+};
+
+const prepareSourceContent = async (content, source, imageDirectory, images) =>
+  replaceAsync(content, /!\[\[(.*?)\]\]/g, async (full, inner) => {
+    const { attachment, alias } = parseEmbed(inner);
+    const image = await processAttachment(source, imageDirectory, attachment, images);
+    if (!image) return full;
+
+    const alt = alias || defaultAlt(attachment);
+    return `![[${image.newName}|${alt}]]`;
+  });
+
+async function doReplace(full, inner) {
+  const { attachment, alias } = parseEmbed(inner);
+  const image = this.images.get(attachment);
+  if (!image) return full;
+
+  return `![${alias || defaultAlt(attachment)}](/images/${image.newName})`;
 }
 
 class CustomTransformStream extends Transform {
-  constructor({ searchPattern, source, target, options, imageDirectory }) {
+  constructor({ searchPattern, source, target, options, imageDirectory, images }) {
     super({ ...options, encoding: "utf-8", objectMode: true });
     this.searchPattern = searchPattern;
     this.tail = "";
     this.source = source;
     this.target = target;
     this.imageDirectory = imageDirectory;
+    this.images = images;
   }
 
   _transform(chunk, encoding, cb) {
@@ -111,6 +175,7 @@ const iterateOverAll = async (source, target, imageDirectory) => {
 
   const files = fs.readdirSync(source);
   const preparedFiles = [];
+  const images = new Map();
 
   for (const file of files) {
     const sourceFile = path.join(source, file);
@@ -118,6 +183,11 @@ const iterateOverAll = async (source, target, imageDirectory) => {
 
     let content = fs.readFileSync(sourceFile, "utf-8");
     const isMarkdown = [".md", ".mdx"].includes(path.extname(file).toLowerCase());
+    if (isMarkdown) {
+      const sourceContent = await prepareSourceContent(content, source, imageDirectory, images);
+      if (sourceContent !== content) fs.writeFileSync(sourceFile, sourceContent);
+      content = sourceContent;
+    }
     if (isMarkdown && !/draft:/.test(content)) {
       content = await addSuggestedTitle(content, file);
     }
@@ -134,6 +204,7 @@ const iterateOverAll = async (source, target, imageDirectory) => {
       source,
       target,
       imageDirectory,
+      images,
     });
 
     const filterStream = new FilterStream();
