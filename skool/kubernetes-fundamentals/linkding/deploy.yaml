@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: linkding
+  name: linkding
+  namespace: linkding
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: linkding
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: linkding
+    spec:
+      containers:
+      - image: sissbruecker/linkding:1.46.2-plus # this will grab from git
+        name: linkding
+        ports: # without this container will not be exposed
+          - containerPort: 9090 # expose port to pod
+        # volumeMounts: # mounts to container.
+        # - mountPath: /app/data
+        #   name: linkding-data # this volume name I want to mount to mountPath
+      # volumes: # level of pod, we need it to mount
+      #   - name: linkding-data
+      #     persistentVolumeClaim:
+      #       claimName: linkding-data
