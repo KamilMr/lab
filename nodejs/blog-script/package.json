@@ -1,0 +1,8 @@
+{
+  "name": "blog-script",
+  "private": true,
+  "type": "commonjs",
+  "dependencies": {
+    "sharp": "^0.35.3"
+  }
+}

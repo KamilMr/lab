@@ -4,6 +4,7 @@ const path = require("node:path");
 const { execFileSync, spawnSync } = require("node:child_process");
 const { Readable, Transform, Writable } = require("node:stream");
 const { pipeline } = require("node:stream/promises");
+const sharp = require("sharp");
 const FilterStream = require("./filter-draft");
 const { addSuggestedTitle } = require("./title-suggestions");
 
@@ -20,17 +21,37 @@ const resolveRelative = (p) => {
   return path.resolve(process.cwd(), p);
 };
 
-function doReplace(full, inner) {
+const replaceAsync = async (value, pattern, replacer) => {
+  const matches = [...value.matchAll(pattern)];
+  let result = "";
+  let lastIndex = 0;
+
+  for (const match of matches) {
+    result += value.slice(lastIndex, match.index);
+    result += await replacer(...match);
+    lastIndex = match.index + match[0].length;
+  }
+
+  return result + value.slice(lastIndex);
+};
+
+async function doReplace(full, inner) {
   const imagePath = path.join(this.source, IMAGE_ATTACHMENT_PATH, inner);
-  if (!fs.existsSync(resolveRelative(imagePath))) return full;
+  const absoluteImagePath = resolveRelative(imagePath);
+  if (!fs.existsSync(absoluteImagePath)) return full;
 
   const { ext, name } = path.parse(inner);
   const safe = name.toLowerCase().replace(/[\s.]/g, "-");
-  const newName = safe + ext;
-  fs.copyFileSync(
-    resolveRelative(imagePath),
-    path.join(this.imageDirectory, newName)
-  );
+  const isPng = ext.toLowerCase() === ".png";
+  const newName = safe + (isPng ? ".webp" : ext);
+  const outputPath = path.join(this.imageDirectory, newName);
+
+  if (isPng) {
+    await sharp(absoluteImagePath).webp({ quality: 82 }).toFile(outputPath);
+  } else {
+    fs.copyFileSync(absoluteImagePath, outputPath);
+  }
+
   return `![${safe}](/images/${newName})`;
 }
 
@@ -47,10 +68,14 @@ class CustomTransformStream extends Transform {
   _transform(chunk, encoding, cb) {
     const overlap = 64;
     const str = this.tail + chunk;
-    const replaced = str.replace(this.searchPattern, doReplace.bind(this));
-    this.tail = replaced.slice(-overlap);
-    this.push(replaced.slice(0, -overlap));
-    cb();
+
+    replaceAsync(str, this.searchPattern, doReplace.bind(this))
+      .then((replaced) => {
+        this.tail = replaced.slice(-overlap);
+        this.push(replaced.slice(0, -overlap));
+        cb();
+      })
+      .catch(cb);
   }
 
   _flush(cb) {
