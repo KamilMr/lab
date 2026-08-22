@@ -61,11 +61,29 @@ const getRasterFormat = async (imagePath) => {
   }
 };
 
-const processAttachment = async (source, imageDirectory, attachment, images) => {
+const isInside = (directory, candidate) => {
+  const relative = path.relative(directory, candidate);
+  return relative && !relative.startsWith(`..${path.sep}`) && relative !== ".." && !path.isAbsolute(relative);
+};
+
+const getAttachmentFile = (attachmentDirectory, realAttachmentDirectory, attachment) => {
+  if (!realAttachmentDirectory) return null;
+
+  const attachmentPath = path.resolve(attachmentDirectory, attachment);
+  if (!isInside(attachmentDirectory, attachmentPath) || !fs.existsSync(attachmentPath)) return null;
+
+  const stat = fs.statSync(attachmentPath);
+  const realAttachmentPath = fs.realpathSync(attachmentPath);
+  if (!stat.isFile() || !isInside(realAttachmentDirectory, realAttachmentPath)) return null;
+
+  return attachmentPath;
+};
+
+const processAttachment = async (attachmentDirectory, realAttachmentDirectory, attachment, images) => {
   if (images.has(attachment)) return images.get(attachment);
 
-  const sourcePath = path.join(source, IMAGE_ATTACHMENT_PATH, attachment);
-  if (!fs.existsSync(sourcePath)) return null;
+  const sourcePath = getAttachmentFile(attachmentDirectory, realAttachmentDirectory, attachment);
+  if (!sourcePath) return null;
 
   const format = await getRasterFormat(sourcePath);
   if (!format) return null;
@@ -73,7 +91,10 @@ const processAttachment = async (source, imageDirectory, attachment, images) => 
   const newName = HASHED_WEBP.test(attachment)
     ? attachment
     : `${crypto.createHash("sha256").update(attachment).digest("hex").slice(0, 12)}.webp`;
-  const newPath = path.join(source, IMAGE_ATTACHMENT_PATH, newName);
+  const newPath = path.join(attachmentDirectory, newName);
+  if (fs.existsSync(newPath) && !getAttachmentFile(attachmentDirectory, realAttachmentDirectory, newName)) {
+    throw new Error(`Invalid attachment path: ${newPath}`);
+  }
 
   if (newPath !== sourcePath) {
     const existingFormat = fs.existsSync(newPath) ? await getRasterFormat(newPath) : null;
@@ -91,19 +112,16 @@ const processAttachment = async (source, imageDirectory, attachment, images) => 
     }
   }
 
-  const outputPath = path.join(imageDirectory, newName);
-  fs.copyFileSync(newPath, outputPath);
-
-  const image = { newName };
+  const image = { newName, sourcePath: newPath };
   images.set(attachment, image);
   images.set(newName, image);
   return image;
 };
 
-const prepareSourceContent = async (content, source, imageDirectory, images) =>
+const prepareSourceContent = async (content, attachmentDirectory, realAttachmentDirectory, images) =>
   replaceAsync(content, /!\[\[(.*?)\]\]/g, async (full, inner) => {
     const { attachment, alias } = parseEmbed(inner);
-    const image = await processAttachment(source, imageDirectory, attachment, images);
+    const image = await processAttachment(attachmentDirectory, realAttachmentDirectory, attachment, images);
     if (!image) return full;
 
     const alt = alias || defaultAlt(attachment);
@@ -115,6 +133,7 @@ async function doReplace(full, inner) {
   const image = this.images.get(attachment);
   if (!image) return full;
 
+  fs.copyFileSync(image.sourcePath, path.join(this.imageDirectory, image.newName));
   return `![${alias || defaultAlt(attachment)}](/images/${image.newName})`;
 }
 
@@ -173,6 +192,11 @@ const iterateOverAll = async (source, target, imageDirectory) => {
   assertExists(target);
   assertExists(imageDirectory);
 
+  const attachmentDirectory = path.join(source, IMAGE_ATTACHMENT_PATH);
+  const attachmentStats = fs.existsSync(attachmentDirectory) && fs.lstatSync(attachmentDirectory);
+  const realAttachmentDirectory = attachmentStats?.isDirectory()
+    ? fs.realpathSync(attachmentDirectory)
+    : null;
   const files = fs.readdirSync(source);
   const preparedFiles = [];
   const images = new Map();
@@ -184,7 +208,12 @@ const iterateOverAll = async (source, target, imageDirectory) => {
     let content = fs.readFileSync(sourceFile, "utf-8");
     const isMarkdown = [".md", ".mdx"].includes(path.extname(file).toLowerCase());
     if (isMarkdown) {
-      const sourceContent = await prepareSourceContent(content, source, imageDirectory, images);
+      const sourceContent = await prepareSourceContent(
+        content,
+        attachmentDirectory,
+        realAttachmentDirectory,
+        images
+      );
       if (sourceContent !== content) fs.writeFileSync(sourceFile, sourceContent);
       content = sourceContent;
     }
@@ -226,16 +255,19 @@ const copyDirectory = (from, to) => {
   fs.cpSync(from, to, { recursive: true });
 };
 
-const createSnapshot = (target, imageDirectory) => {
+const createSnapshot = (source, target, imageDirectory) => {
   const snapshotRoot = fs.mkdtempSync(path.join(os.tmpdir(), "publish-snapshot-"));
+  const sourceSnapshot = path.join(snapshotRoot, "source");
   const targetSnapshot = path.join(snapshotRoot, "target");
   const imageSnapshot = path.join(snapshotRoot, "images");
 
+  copyDirectory(source, sourceSnapshot);
   copyDirectory(target, targetSnapshot);
   copyDirectory(imageDirectory, imageSnapshot);
 
   return {
     restore() {
+      copyDirectory(sourceSnapshot, source);
       copyDirectory(targetSnapshot, target);
       copyDirectory(imageSnapshot, imageDirectory);
     },
@@ -305,7 +337,7 @@ const publishAndCommit = async (sourceDirectory, targetDirectory, imageDirectory
   const targetPath = path.relative(gitRoot, target);
   const imagesPath = path.relative(gitRoot, images);
   const gitOptions = { cwd: gitRoot };
-  const snapshot = createSnapshot(target, images);
+  const snapshot = createSnapshot(source, target, images);
 
   try {
     await iterateOverAll(source, target, images);
