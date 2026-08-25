@@ -1,0 +1,20 @@
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2.0.22
+    ports:
+      - target: 1883
+        protocol: tcp
+    volumes:
+      - type: bind
+        source: ./config/
+        target: /mosquitto/config/
+
+  valkey:
+    image: valkey/valkey:9.1.1
+    ports:
+      - target: 6379
+        protocol: tcp
+
+volumes:
+  data:
+    name: "mqtt-broker-data"
