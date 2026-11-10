@@ -1,7 +1,8 @@
 # Study log — YYYY-MM-DD
 
 - **Sprint day:**
-- **Focused time:**
+- **Planned time:** 2h / 4h
+- **Focused time completed:**
 - **Course position before:**
 - **Course position after:**
 

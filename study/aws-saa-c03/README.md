@@ -12,13 +12,14 @@ Public study notes for the [AWS Certified Solutions Architect Associate SAA-C03 
 
 ## Daily duty
 
-The default daily target is:
+The daily study target is:
 
-- at least 30 minutes of focused study;
-- a short written note about what was learned; and
+- **Monday–Tuesday:** 2 hours per day;
+- **Wednesday–Sunday:** 4 hours per day;
+- one short written note about what was learned; and
 - updated course position and sprint status.
 
-Change this definition before the sprint starts if a different target is more realistic. Consistency matters more than note length.
+This gives a planned total of **24 study hours per week**. A sprint day is complete when its scheduled study time and the two documentation steps are complete.
 
 ## Structure
 
