@@ -5,15 +5,15 @@
 - **Study schedule:** 2 hours on Monday–Tuesday; 4 hours on Wednesday–Sunday.
 - **Weekly target:** 24 hours.
 - **Daily duty:** Complete the scheduled study time, write one short learning note, and update the course position.
-- **Completed:** 1 / 60
-- **Hours completed:** 2
+- **Completed:** 2 / 60
+- **Hours completed:** 4
 
 Mark `Done` only after the full daily duty is complete. Record the study time in `Focus` with the topic, for example `4h — IAM policies`. Add a link to a daily or chapter note as evidence when useful.
 
 | Day | Date | Done | Focus | Note / evidence |
 |---:|---|:---:|---|---|
 | 1 | 2026-11-09 | [x] | 2h — Sections 1–3 | [Daily note](../daily/2026-11-09.md) |
-| 2 | | [ ] | | |
+| 2 | 2026-11-10 | [x] | 2h — IAM and AWS CLI | [Daily note](../daily/2026-11-10.md) |
 | 3 | | [ ] | | |
 | 4 | | [ ] | | |
 | 5 | | [ ] | | |

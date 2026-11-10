@@ -17,6 +17,7 @@ Start from [`../templates/chapter-note.md`](../templates/chapter-note.md). Keep 
 | 1 | Introduction — AWS Certified Solutions Architect Associate | Complete | 6/6 lectures, 15 min |
 | 2 | Code & Slides Download | Complete | 1/1 lecture, 1 min |
 | 3 | Getting started with AWS | Complete | 3/3 lectures, 13 min |
-| 4 | Title not recorded | Next | — |
+| 4 | IAM and AWS CLI | Complete | [Notes](04-iam-and-aws-cli.md) |
+| 5 | Title not recorded | Next | — |
 
 Suggested statuses: `Not started`, `In progress`, `Review`, and `Complete`.
