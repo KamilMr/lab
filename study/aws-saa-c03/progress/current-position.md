@@ -4,11 +4,11 @@ Update this file whenever you stop studying so the next session has a clear star
 
 | Field | Current value |
 |---|---|
-| Section / chapter | Not recorded after Day 1 |
-| Lecture / topic | Not recorded after Day 1 |
+| Section / chapter | Sections 1–3 complete; Section 4 is next |
+| Lecture / topic | Section 3 complete (3/3 lectures) |
 | Lecture URL | <https://www.udemy.com/course/aws-certified-solutions-architect-associate-saa-c03/learn/lecture/26623458#learning-tools> |
-| Status | In progress — exact position needs to be added |
-| Next action | Record the current section and lecture before the next study session |
+| Status | In progress |
+| Next action | Start Section 4 and record its title |
 | Last updated | 2026-11-09 |
 
 ## Current questions

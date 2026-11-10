@@ -14,6 +14,9 @@ Start from [`../templates/chapter-note.md`](../templates/chapter-note.md). Keep 
 
 | Order | Course section / chapter | Status | Notes |
 |---:|---|---|---|
-| 1 | Add the first course section | Not started | — |
+| 1 | Introduction — AWS Certified Solutions Architect Associate | Complete | 6/6 lectures, 15 min |
+| 2 | Code & Slides Download | Complete | 1/1 lecture, 1 min |
+| 3 | Getting started with AWS | Complete | 3/3 lectures, 13 min |
+| 4 | Title not recorded | Next | — |
 
 Suggested statuses: `Not started`, `In progress`, `Review`, and `Complete`.

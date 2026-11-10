@@ -12,7 +12,7 @@ Mark `Done` only after the full daily duty is complete. Record the study time in
 
 | Day | Date | Done | Focus | Note / evidence |
 |---:|---|:---:|---|---|
-| 1 | 2026-11-09 | [x] | 2h — topic not recorded | [Daily note](../daily/2026-11-09.md) |
+| 1 | 2026-11-09 | [x] | 2h — Sections 1–3 | [Daily note](../daily/2026-11-09.md) |
 | 2 | | [ ] | | |
 | 3 | | [ ] | | |
 | 4 | | [ ] | | |
