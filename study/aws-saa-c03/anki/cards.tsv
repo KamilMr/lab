@@ -1,0 +1,12 @@
+#separator:tab
+#html:true
+#notetype:Basic
+#deck:saa-c03::iam
+#columns:Front	Back	Tags
+#tags column:3
+What is an IAM role?	An AWS identity with permissions that can be assumed by trusted users, applications, or AWS services. It provides <b>temporary credentials</b> rather than long-term credentials.	iam
+Which IAM security tool reports the credential status of all IAM users in an AWS account?	<b>IAM Credentials Report</b>. It is an account-level report covering IAM users and the status of their passwords, access keys, and MFA credentials.	iam
+Do IAM users access AWS using the root account’s credentials?	<b>No.</b> IAM users use their own console credentials or access keys. Root credentials should not be shared or used for routine work.	iam
+What is an IAM policy?	A JSON document defining permissions for AWS actions and resources. Policies can be associated with IAM users, groups, roles, and some AWS resources.	iam
+Can an IAM user group contain another IAM user group?	<b>No.</b> IAM user groups cannot be nested. A group can contain IAM users, and a user can belong to multiple groups.	iam
+Which element belongs to the overall IAM policy rather than an individual policy statement?	<b>Version</b>. A statement can contain elements such as <code>Sid</code>, <code>Effect</code>, <code>Action</code>, <code>Resource</code>, <code>Condition</code>, and sometimes <code>Principal</code>.	iam
